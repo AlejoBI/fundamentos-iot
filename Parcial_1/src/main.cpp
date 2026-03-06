@@ -6,6 +6,26 @@
 #include <time.h>
 #include "config.h"
 
+#define DHTPIN 33       // Pin del DHT22 (actual: 33, alternativa DHT11: 26)
+#define DHTTYPE DHT22   // Tipo de sensor DHT (actual: DHT22)
+#define PIN_MQ135 35    // Pin analógico MQ-135 (actual: 35, alternativa: 34)
+#define LED_VERDE 25    // LED Estado Normal (actual: 25)
+#define LED_AMARILLO 26 // LED Estado Alerta / Extractor (actual: 26)
+#define LED_ROJO 27     // LED Estado Emergencia / Alarma (actual: 27)
+
+// --- UMBRALES DE SENSORES ---
+const float UMBRAL_TEMP = 30.0; // Temperatura de alerta en °C (actual: 35.0)
+const int UMBRAL_GAS = 3000;    // Gas/humo en valor analógico (actual: 3000, antes: 1500)
+
+// --- INTERVALOS DE TIEMPO (en ciclos de 100ms) ---
+const int CICLOS_NORMAL = 600;    // Estado Normal: 60 segundos (actual: 600 = 60s)
+const int CICLOS_ALERTA = 100;    // Estado Alerta: 10 segundos (actual: 100 = 10s)
+const int CICLOS_EMERGENCIA = 20; // Estado Emergencia: 2 segundos (actual: 20 = 2s)
+
+const char *NOMBRE_ZONA = "Cocina-Principal"; // Nombre de la zona monitoreada (actual: "Cocina-Principal")
+
+// ==========================================
+
 // 1. Configuración de Wi-Fi y MQTT (Desde tu config.h)
 const char *ssid = WIFI_SSID;
 const char *password = WIFI_PASSWORD;
@@ -16,27 +36,12 @@ const char *mqtt_pass = MQTT_PASS;
 const char *topico_datos = TOPICO_DATOS;
 const char *topico_comandos = TOPICO_COMANDOS;
 
-// 2. Definir pines de Sensores
-#define DHTPIN 33     // Pin del DHT22 DHT11 pin 26
-#define DHTTYPE DHT22 // Tipo de sensor DHT
-#define PIN_MQ135 35  // Pin analógico MQ-135 34
-
-// 3. Definir pines de LEDs (Actuadores / Semáforo)
-#define LED_VERDE 25    // Estado Normal
-#define LED_AMARILLO 26 // Estado Alerta (Simula Extractor)
-#define LED_ROJO 27     // Estado Emergencia (Simula Alarma)
-
-// Umbrales (Ajustados para lectura analógica 0-4095)
-const float UMBRAL_TEMP_ALERTA = 35.0;     // Sensor DHT22 temperatura en °C
-const float UMBRAL_TEMP_EMERGENCIA = 50.0; // Sensor DHT22 humedad en %
-const int UMBRAL_MQ135_ALERTA = 3000;      // Equivalente a gas/humo denso Sensor MQ-135 ANTES (1500)
-
 // Inicializar
 DHT dht(DHTPIN, DHTTYPE);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-bool sistemaActivo = false; // Inicia pausado hasta recibir comando
+bool sistemaActivo = false;
 
 // Callback para recibir comandos ("PAUSA" o "INICIAR")
 void callback(char *topic, byte *payload, unsigned int length)
@@ -139,7 +144,7 @@ void setup()
   digitalWrite(LED_ROJO, LOW);
 
   Serial.println("Iniciando Sistema IoT...");
-  Serial.println("Sistema PAUSADO. Envía {\"msg\":\"INICIAR\"} por MQTT para comenzar.");
+  Serial.println("Sistema PAUSADO. Envía {msg:INICIAR} por MQTT para comenzar.");
 
   dht.begin();
   setup_wifi();
@@ -168,30 +173,27 @@ void loop()
       return;
     }
 
-    // ==========================================
     // MÁQUINA DE ESTADOS Y LÓGICA DE ACTUADORES
-    // ==========================================
     String estadoActual = "NORMAL";
-    int ciclosEspera = 600; // 60 segundos por defecto (600 iteraciones de 100ms)
+    int ciclosEspera = CICLOS_NORMAL;
 
-    // Evaluar estados (nuevo comportamiento):
-    // - Si temperatura alta Y gas (MQ135) -> EMERGENCIA
+    // - Si temperatura alta Y gas -> EMERGENCIA
     // - Si solo temperatura alta -> ALERTA
     // - Si solo gas -> ALERTA
-    if (temperatura >= UMBRAL_TEMP_ALERTA && valorMQ135 >= UMBRAL_MQ135_ALERTA)
+    if (temperatura >= UMBRAL_TEMP && valorMQ135 >= UMBRAL_GAS)
     {
       // Temperatura alta combinada con detección de gas -> EMERGENCIA
       estadoActual = "EMERGENCIA";
-      ciclosEspera = 20; // 2 segundos
+      ciclosEspera = CICLOS_EMERGENCIA;
       digitalWrite(LED_VERDE, LOW);
       digitalWrite(LED_AMARILLO, LOW);
       digitalWrite(LED_ROJO, HIGH); // Sirena encendida
     }
-    else if (temperatura >= UMBRAL_TEMP_ALERTA || valorMQ135 >= UMBRAL_MQ135_ALERTA)
+    else if (temperatura >= UMBRAL_TEMP || valorMQ135 >= UMBRAL_GAS)
     {
       // Solo temperatura alta -> ALERTA
       estadoActual = "ALERTA";
-      ciclosEspera = 100; // 10 segundos
+      ciclosEspera = CICLOS_ALERTA;
       digitalWrite(LED_VERDE, LOW);
       digitalWrite(LED_AMARILLO, HIGH); // Extractor encendido
       digitalWrite(LED_ROJO, LOW);
@@ -199,21 +201,19 @@ void loop()
     // Estado Normal
     else
     {
-      digitalWrite(LED_VERDE, HIGH); // Todo ok
+      digitalWrite(LED_VERDE, HIGH);
       digitalWrite(LED_AMARILLO, LOW);
       digitalWrite(LED_ROJO, LOW);
     }
 
-    // ==========================================
     // EMPAQUETADO Y ENVÍO JSON
-    // ==========================================
     StaticJsonDocument<256> doc;
 
-    doc["zona"] = "Cocina-Principal";
-    doc["estado_riesgo"] = estadoActual; // Agregamos el estado al JSON
+    doc["zona"] = NOMBRE_ZONA;
+    doc["estado_riesgo"] = estadoActual;
     doc["temperatura_C"] = temperatura;
     doc["mq135_aire"] = valorMQ135;
-    // Timestamp formateado
+
     time_t now = time(nullptr);
     struct tm *timeinfo = localtime(&now);
     char timeString[32];
@@ -230,16 +230,13 @@ void loop()
 
     client.publish(topico_datos, jsonBuffer);
 
-    // ==========================================
-    // TEMPORIZADOR DINÁMICO (No bloqueante)
-    // ==========================================
     // Espera según la gravedad del evento (Normal=60s, Alerta=10s, Emergencia=2s)
     for (int i = 0; i < ciclosEspera; i++)
     {
       client.loop(); // Sigue escuchando comandos mientras espera
       delay(100);
       if (!sistemaActivo)
-        break; // Si lo pausan en medio del delay, salir.
+        break; // Si el sistema se pausa durante la espera, salir del ciclo para no retrasar la respuesta a la orden de pausa
     }
   }
   else
