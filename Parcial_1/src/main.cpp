@@ -17,10 +17,9 @@ const char *topico_datos = TOPICO_DATOS;
 const char *topico_comandos = TOPICO_COMANDOS;
 
 // 2. Definir pines de Sensores
-#define DHTPIN 33     // Pin del DHT22
+#define DHTPIN 33     // Pin del DHT22 DHT11 pin 26
 #define DHTTYPE DHT22 // Tipo de sensor DHT
-#define PIN_MQ135 34  // Pin analógico MQ-135
-#define PIN_MQ7 35    // Pin analógico MQ-7
+#define PIN_MQ135 35  // Pin analógico MQ-135 34
 
 // 3. Definir pines de LEDs (Actuadores / Semáforo)
 #define LED_VERDE 25    // Estado Normal
@@ -30,8 +29,7 @@ const char *topico_comandos = TOPICO_COMANDOS;
 // Umbrales (Ajustados para lectura analógica 0-4095)
 const float UMBRAL_TEMP_ALERTA = 35.0;     // Sensor DHT22 temperatura en °C
 const float UMBRAL_TEMP_EMERGENCIA = 50.0; // Sensor DHT22 humedad en %
-const int UMBRAL_MQ135_ALERTA = 1500;      // Equivalente a gas/humo denso Sensor MQ-135
-const int UMBRAL_MQ7_EMERGENCIA = 2000;    // Equivalente a CO tóxico (>50ppm) Sensor MQ-7
+const int UMBRAL_MQ135_ALERTA = 3000;      // Equivalente a gas/humo denso Sensor MQ-135 ANTES (1500)
 
 // Inicializar
 DHT dht(DHTPIN, DHTTYPE);
@@ -56,7 +54,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   DeserializationError error = deserializeJson(doc, mensaje);
   if (error)
   {
-    Serial.println("❌ Error al parsear el JSON del comando");
+    Serial.println("Error al parsear el JSON del comando");
     return;
   }
   String comando = doc["msg"] | "";
@@ -162,7 +160,6 @@ void loop()
   {
     float temperatura = dht.readTemperature();
     int valorMQ135 = analogRead(PIN_MQ135);
-    int valorMQ7 = analogRead(PIN_MQ7);
 
     if (isnan(temperatura))
     {
@@ -177,18 +174,22 @@ void loop()
     String estadoActual = "NORMAL";
     int ciclosEspera = 600; // 60 segundos por defecto (600 iteraciones de 100ms)
 
-    // Evaluar Emergencia (Prioridad Máxima)
-    if (temperatura >= UMBRAL_TEMP_EMERGENCIA || valorMQ7 >= UMBRAL_MQ7_EMERGENCIA)
+    // Evaluar estados (nuevo comportamiento):
+    // - Si temperatura alta Y gas (MQ135) -> EMERGENCIA
+    // - Si solo temperatura alta -> ALERTA
+    // - Si solo gas -> ALERTA
+    if (temperatura >= UMBRAL_TEMP_ALERTA && valorMQ135 >= UMBRAL_MQ135_ALERTA)
     {
+      // Temperatura alta combinada con detección de gas -> EMERGENCIA
       estadoActual = "EMERGENCIA";
       ciclosEspera = 20; // 2 segundos
       digitalWrite(LED_VERDE, LOW);
       digitalWrite(LED_AMARILLO, LOW);
       digitalWrite(LED_ROJO, HIGH); // Sirena encendida
     }
-    // Evaluar Alerta
     else if (temperatura >= UMBRAL_TEMP_ALERTA || valorMQ135 >= UMBRAL_MQ135_ALERTA)
     {
+      // Solo temperatura alta -> ALERTA
       estadoActual = "ALERTA";
       ciclosEspera = 100; // 10 segundos
       digitalWrite(LED_VERDE, LOW);
@@ -212,7 +213,6 @@ void loop()
     doc["estado_riesgo"] = estadoActual; // Agregamos el estado al JSON
     doc["temperatura_C"] = temperatura;
     doc["mq135_aire"] = valorMQ135;
-    doc["mq7_co"] = valorMQ7;
     // Timestamp formateado
     time_t now = time(nullptr);
     struct tm *timeinfo = localtime(&now);
