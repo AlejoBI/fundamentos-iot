@@ -14,12 +14,12 @@
 #define LED_ROJO 27     // LED Estado Emergencia / Alarma (actual: 27)
 
 // --- UMBRALES DE SENSORES ---
-const float UMBRAL_TEMP = 30.0; // Temperatura de alerta en °C (actual: 35.0)
-const int UMBRAL_GAS = 3000;    // Gas/humo en valor analógico (actual: 3000, antes: 1500)
+const float UMBRAL_TEMP = 28.0; // Temperatura de alerta en °C (actual: 35.0)
+const int UMBRAL_GAS = 3600;    // Gas/humo en valor analógico (actual: 3000, antes: 1500)
 
 // --- INTERVALOS DE TIEMPO (en ciclos de 100ms) ---
-const int CICLOS_NORMAL = 600;    // Estado Normal: 60 segundos (actual: 600 = 60s)
-const int CICLOS_ALERTA = 100;    // Estado Alerta: 10 segundos (actual: 100 = 10s)
+const int CICLOS_NORMAL = 100;    // Estado Normal: 60 segundos (actual: 600 = 60s)
+const int CICLOS_ALERTA = 50;     // Estado Alerta: 10 segundos (actual: 100 = 10s)
 const int CICLOS_EMERGENCIA = 20; // Estado Emergencia: 2 segundos (actual: 20 = 2s)
 
 const char *NOMBRE_ZONA = "Cocina-Principal"; // Nombre de la zona monitoreada (actual: "Cocina-Principal")
