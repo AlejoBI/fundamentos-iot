@@ -6,3 +6,4 @@
 
 # No subir credenciales
 include/config.h
+.env

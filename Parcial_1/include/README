@@ -48,6 +48,5 @@ https://gcc.gnu.org/onlinedocs/cpp/Header-Files.html
 #define MQTT_USER "tu_correo@ejemplo.com"
 #define MQTT_PASS "tu_clave_mqtt"
 #define TOPICO_DATOS "tu_correo@ejemplo.com/alertas"
-#define TOPICO_COMANDOS "tu_correo@ejemplo.com/comandos"
 
 #endif // CONFIG_H

@@ -1,6 +1,6 @@
 [
   {
-    "id": "2f7b12fa84740d20",
+    "id": "18074f7602d547cc",
     "type": "tab",
     "label": "Flujo 1",
     "disabled": false,
@@ -8,9 +8,9 @@
     "env": []
   },
   {
-    "id": "39f0c3491b3a6de5",
+    "id": "dfe6f4c541676244",
     "type": "mqtt in",
-    "z": "2f7b12fa84740d20",
+    "z": "18074f7602d547cc",
     "name": "alertas",
     "topic": "alejandro.bravo_isa@uao.edu.co/alertas",
     "qos": "2",
@@ -20,26 +20,26 @@
     "rap": true,
     "rh": 0,
     "inputs": 0,
-    "x": 170,
-    "y": 160,
-    "wires": [["f949e6807008efc5"]]
+    "x": 160,
+    "y": 190,
+    "wires": [["aea93dc34a7a45e9"]]
   },
   {
-    "id": "f949e6807008efc5",
+    "id": "aea93dc34a7a45e9",
     "type": "json",
-    "z": "2f7b12fa84740d20",
+    "z": "18074f7602d547cc",
     "name": "parse json alertas",
     "property": "payload",
     "action": "obj",
     "pretty": false,
     "x": 350,
-    "y": 160,
-    "wires": [["41847bf0afa6e13c"]]
+    "y": 190,
+    "wires": [["a5127c28bae01708"]]
   },
   {
-    "id": "41847bf0afa6e13c",
+    "id": "a5127c28bae01708",
     "type": "function",
-    "z": "2f7b12fa84740d20",
+    "z": "18074f7602d547cc",
     "name": "procesar estados (ESP32)",
     "func": "const UMBRAL_TEMP = 28.0;\nconst UMBRAL_GAS = 3600;\nconst CICLOS_NORMAL = 100;\nconst CICLOS_ALERTA = 50;\nconst CICLOS_EMERGENCIA = 20;\n\nconst p = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\n\nfunction toNumber(v) {\n    if (v === null || v === undefined || v === \"\") return NaN;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : NaN;\n}\n\nconst temperatura = toNumber(p.temperatura_C ?? p.temperatura ?? p.temp);\nconst gas = toNumber(p.mq135_aire ?? p.gas ?? p.mq135);\n\nlet estado = \"\";\nlet ciclos = 0;\nlet detalle = \"\";\n\nif (Number.isFinite(temperatura) && Number.isFinite(gas)) {\n    if (temperatura >= UMBRAL_TEMP && gas >= UMBRAL_GAS) {\n        estado = \"EMERGENCIA\";\n        ciclos = CICLOS_EMERGENCIA;\n        detalle = \"Temperatura y gas altos\";\n    } else if (temperatura >= UMBRAL_TEMP || gas >= UMBRAL_GAS) {\n        estado = \"ALERTA\";\n        ciclos = CICLOS_ALERTA;\n        detalle = \"Temperatura o gas alto\";\n    } else {\n        estado = \"NORMAL\";\n        ciclos = CICLOS_NORMAL;\n        detalle = \"Valores dentro de rango\";\n    }\n} else {\n    estado = String(p.estado_riesgo || \"INVALIDO\").toUpperCase();\n    detalle = \"No llegaron temperatura_C y mq135_aire; se conserva estado recibido\";\n}\n\nmsg.payload.temperatura_C = Number.isFinite(temperatura) ? temperatura : p.temperatura_C;\nmsg.payload.mq135_aire = Number.isFinite(gas) ? gas : p.mq135_aire;\nmsg.payload.estado_riesgo = estado;\nmsg.payload.procesado_nodered = true;\nmsg.payload.tiempo_espera_seg = ciclos > 0 ? ciclos * 0.1 : null;\nmsg.payload.detalle_estado = detalle;\n\nif (estado === \"NORMAL\") {\n    node.status({ fill: \"green\", shape: \"dot\", text: \"NORMAL\" });\n} else if (estado === \"ALERTA\") {\n    node.status({ fill: \"yellow\", shape: \"dot\", text: \"ALERTA\" });\n} else if (estado === \"EMERGENCIA\") {\n    node.status({ fill: \"red\", shape: \"dot\", text: \"EMERGENCIA\" });\n} else {\n    node.status({ fill: \"grey\", shape: \"ring\", text: estado });\n}\n\nconst resumen = {\n    topic: msg.topic,\n    payload: {\n        estado: estado,\n        temperatura_C: msg.payload.temperatura_C,\n        mq135_aire: msg.payload.mq135_aire,\n        detalle: detalle,\n        timestamp: msg.payload.timestamp || null\n    }\n};\n\nreturn [msg, resumen];",
     "outputs": 2,
@@ -49,13 +49,29 @@
     "finalize": "",
     "libs": [],
     "x": 600,
-    "y": 160,
-    "wires": [["739ac79f66d7e67b"], ["77b4174901bd1c61"]]
+    "y": 190,
+    "wires": [["fde12c0e5f4ea996", "83c119ea03f8c509"], ["3f2820d13e31e60b"]]
   },
   {
-    "id": "739ac79f66d7e67b",
+    "id": "83c119ea03f8c509",
     "type": "function",
-    "z": "2f7b12fa84740d20",
+    "z": "18074f7602d547cc",
+    "name": "build SQL insert",
+    "func": "const p = msg.payload || {};\n\nconst temp = Number(p.temperatura_C);\nconst gas = Number(p.mq135_aire);\nif (!Number.isFinite(temp) || !Number.isFinite(gas)) {\n    return null;\n}\n\nconst deviceId = String(p.device_id || \"ESP32\");\nconst zona = String(p.zona || \"N/A\");\nconst estado = String(p.estado_riesgo || \"INVALIDO\");\nlet ts = String(p.timestamp || \"\");\n\nif (!ts) {\n    const now = new Date();\n    ts = now.toISOString().slice(0, 19).replace(\"T\", \" \");\n}\n\nmsg.topic = \"INSERT INTO mediciones (device_id, zona, temperatura_c, mq135_aire, estado_riesgo, timestamp_origen) VALUES (?, ?, ?, ?, ?, ?)\";\nmsg.payload = [deviceId, zona, Number(temp.toFixed(2)), Math.round(gas), estado, ts];\nmsg.queryType = \"insert\";\n\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 780,
+    "y": 310,
+    "wires": [["0cac961ba64670e2"]]
+  },
+  {
+    "id": "fde12c0e5f4ea996",
+    "type": "function",
+    "z": "18074f7602d547cc",
     "name": "indicadores activos",
     "func": "const estado = String((msg.payload && msg.payload.estado_riesgo) || \"\").toUpperCase();\n\nfunction indicador(nombre) {\n    const activo = estado === nombre;\n    return {\n        payload: {\n            estado: nombre,\n            marca: activo ? \"ACTIVO\" : \"INACTIVO\",\n            actual: estado\n        }\n    };\n}\n\nreturn [\n    indicador(\"NORMAL\"),\n    indicador(\"ALERTA\"),\n    indicador(\"EMERGENCIA\")\n];",
     "outputs": 3,
@@ -65,81 +81,145 @@
     "finalize": "",
     "libs": [],
     "x": 850,
-    "y": 120,
-    "wires": [["c59ec0a6e8b47350"], ["7932fd5102b94d6a"], ["5d7a0b88afa0c6ee"]]
+    "y": 140,
+    "wires": [["e20662aa3f843048"], ["1ded669cfb93b4b2"], ["7466850b044c3070"]]
   },
   {
-    "id": "e4938c5085cae2c3",
+    "id": "9d666c52e9686b0a",
     "type": "inject",
-    "z": "2f7b12fa84740d20",
-    "name": "INICIAR",
+    "z": "18074f7602d547cc",
+    "name": "SELECT ultimas 20",
     "props": [
       {
         "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
       }
     ],
     "repeat": "",
     "crontab": "",
     "once": false,
     "onceDelay": 0.1,
-    "topic": "alejandro.bravo_isa@uao.edu.co/comandos",
-    "payload": "{\"msg\":\"INICIAR\"}",
-    "payloadType": "json",
-    "x": 340,
-    "y": 240,
-    "wires": [["1bad22a2d352e2bb"]]
+    "payload": "",
+    "payloadType": "date",
+    "x": 280,
+    "y": 350,
+    "wires": [["183d0a79a7d33472"]]
   },
   {
-    "id": "525ddc95dbac9c26",
+    "id": "8847db042f035eb7",
     "type": "inject",
-    "z": "2f7b12fa84740d20",
-    "name": "PAUSA",
+    "z": "18074f7602d547cc",
+    "name": "SELECT EMERGENCIA",
     "props": [
       {
         "p": "payload"
-      },
-      {
-        "p": "topic",
-        "vt": "str"
       }
     ],
     "repeat": "",
     "crontab": "",
     "once": false,
     "onceDelay": 0.1,
-    "topic": "alejandro.bravo_isa@uao.edu.co/comandos",
-    "payload": "{\"msg\":\"PAUSA\"}",
-    "payloadType": "json",
-    "x": 340,
-    "y": 280,
-    "wires": [["1bad22a2d352e2bb"]]
+    "payload": "EMERGENCIA",
+    "payloadType": "str",
+    "x": 290,
+    "y": 400,
+    "wires": [["183d0a79a7d33472"]]
   },
   {
-    "id": "1bad22a2d352e2bb",
-    "type": "mqtt out",
-    "z": "2f7b12fa84740d20",
-    "name": "comandos",
-    "topic": "alejandro.bravo_isa@uao.edu.co/comandos",
-    "qos": "0",
-    "retain": "false",
-    "respTopic": "",
-    "contentType": "",
-    "userProps": "",
-    "correl": "",
-    "expiry": "",
-    "broker": "fd407c03c80b70fc",
+    "id": "33f9461746121185",
+    "type": "inject",
+    "z": "18074f7602d547cc",
+    "name": "SELECT ALERTA",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "ALERTA",
+    "payloadType": "str",
+    "x": 280,
+    "y": 450,
+    "wires": [["183d0a79a7d33472"]]
+  },
+  {
+    "id": "18bcfb603074bffd",
+    "type": "inject",
+    "z": "18074f7602d547cc",
+    "name": "SELECT NORMAL",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "NORMAL",
+    "payloadType": "str",
+    "x": 280,
+    "y": 500,
+    "wires": [["183d0a79a7d33472"]]
+  },
+  {
+    "id": "f75e0fcc4317cf12",
+    "type": "inject",
+    "z": "18074f7602d547cc",
+    "name": "BORRAR TODOS LOS REGISTROS",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "",
+    "payloadType": "date",
+    "x": 320,
+    "y": 560,
+    "wires": [["85f44c6f0fa9f673"]]
+  },
+  {
+    "id": "85f44c6f0fa9f673",
+    "type": "function",
+    "z": "18074f7602d547cc",
+    "name": "build SQL delete all",
+    "func": "msg.topic = \"DELETE FROM mediciones;\";\nmsg.payload = [];\nmsg.queryType = \"deleteAll\";\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
     "x": 550,
-    "y": 260,
-    "wires": []
+    "y": 560,
+    "wires": [["0cac961ba64670e2"]]
   },
   {
-    "id": "77b4174901bd1c61",
+    "id": "183d0a79a7d33472",
+    "type": "function",
+    "z": "18074f7602d547cc",
+    "name": "build SQL select",
+    "func": "const estado = String(msg.payload || \"\").trim().toUpperCase();\n\nconst base = \"SELECT id, device_id, zona, temperatura_c, mq135_aire, estado_riesgo, timestamp_origen, created_at FROM mediciones\";\n\nif ([\"NORMAL\", \"ALERTA\", \"EMERGENCIA\"].includes(estado)) {\n    msg.topic = `${base} WHERE estado_riesgo='${estado}' ORDER BY id DESC LIMIT 20;`;\n} else {\n    msg.topic = `${base} ORDER BY id DESC LIMIT 20;`;\n}\n\nmsg.queryType = \"select\";\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 540,
+    "y": 420,
+    "wires": [["0cac961ba64670e2"]]
+  },
+  {
+    "id": "3f2820d13e31e60b",
     "type": "debug",
-    "z": "2f7b12fa84740d20",
+    "z": "18074f7602d547cc",
     "name": "debug estado procesado",
     "active": true,
     "tosidebar": true,
@@ -149,14 +229,122 @@
     "targetType": "msg",
     "statusVal": "",
     "statusType": "auto",
-    "x": 890,
-    "y": 240,
+    "x": 870,
+    "y": 230,
     "wires": []
   },
   {
-    "id": "c59ec0a6e8b47350",
+    "id": "0cac961ba64670e2",
+    "type": "mysql",
+    "z": "18074f7602d547cc",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 760,
+    "y": 420,
+    "wires": [["db6d6bebe4267e7a"]]
+  },
+  {
+    "id": "db6d6bebe4267e7a",
+    "type": "switch",
+    "z": "18074f7602d547cc",
+    "name": "tipo consulta",
+    "property": "queryType",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "insert",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "select",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "deleteAll",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 3,
+    "x": 940,
+    "y": 420,
+    "wires": [["de37c058741bf80a"], ["7e030f50f29ee6ec"], ["ffb7fce52f1889f9"]]
+  },
+  {
+    "id": "7e030f50f29ee6ec",
+    "type": "function",
+    "z": "18074f7602d547cc",
+    "name": "formato select tabla",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\n\nif (rows.length === 0) {\n    msg.payload = \"Sin resultados\";\n    return msg;\n}\n\nconst cols = [\"id\", \"device_id\", \"zona\", \"temperatura_c\", \"mq135_aire\", \"estado_riesgo\", \"timestamp_origen\"];\nconst safe = (v) => String(v ?? \"\");\nconst maxRows = 20;\nconst data = rows.slice(0, maxRows);\n\nconst widths = cols.map((c) => c.length);\nfor (const r of data) {\n    cols.forEach((c, i) => {\n        const l = safe(r[c]).length;\n        if (l > widths[i]) widths[i] = Math.min(l, 28);\n    });\n}\n\nconst trunc = (s, w) => (s.length > w ? s.slice(0, w - 1) + \"…\" : s);\nconst pad = (s, w) => trunc(s, w).padEnd(w, \" \" );\n\nconst header = cols.map((c, i) => pad(c, widths[i])).join(\" | \" );\nconst sep = widths.map((w) => \"-\".repeat(w)).join(\"-+-\");\nconst body = data.map((r) => cols.map((c, i) => pad(safe(r[c]), widths[i])).join(\" | \" )).join(\"\\n\");\n\nmsg.payload = `Filas devueltas: ${rows.length}\\n\\n${header}\\n${sep}\\n${body}`;\nreturn msg;",
+    "outputs": 1,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1130,
+    "y": 460,
+    "wires": [["0e7cfa0d4df0fd0c"]]
+  },
+  {
+    "id": "de37c058741bf80a",
     "type": "debug",
-    "z": "2f7b12fa84740d20",
+    "z": "18074f7602d547cc",
+    "name": "debug mysql insert",
+    "active": true,
+    "tosidebar": false,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.affectedRows",
+    "targetType": "msg",
+    "statusVal": "payload.affectedRows",
+    "statusType": "msg",
+    "x": 1150,
+    "y": 380,
+    "wires": []
+  },
+  {
+    "id": "0e7cfa0d4df0fd0c",
+    "type": "debug",
+    "z": "18074f7602d547cc",
+    "name": "debug select tabla",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1340,
+    "y": 460,
+    "wires": []
+  },
+  {
+    "id": "ffb7fce52f1889f9",
+    "type": "debug",
+    "z": "18074f7602d547cc",
+    "name": "debug delete all",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.affectedRows",
+    "statusType": "msg",
+    "x": 1140,
+    "y": 540,
+    "wires": []
+  },
+  {
+    "id": "e20662aa3f843048",
+    "type": "debug",
+    "z": "18074f7602d547cc",
     "name": "indicador NORMAL",
     "active": true,
     "tosidebar": false,
@@ -167,13 +355,13 @@
     "statusVal": "payload.marca",
     "statusType": "msg",
     "x": 1070,
-    "y": 60,
+    "y": 80,
     "wires": []
   },
   {
-    "id": "7932fd5102b94d6a",
+    "id": "1ded669cfb93b4b2",
     "type": "debug",
-    "z": "2f7b12fa84740d20",
+    "z": "18074f7602d547cc",
     "name": "indicador ALERTA",
     "active": true,
     "tosidebar": false,
@@ -184,13 +372,13 @@
     "statusVal": "payload.marca",
     "statusType": "msg",
     "x": 1070,
-    "y": 120,
+    "y": 130,
     "wires": []
   },
   {
-    "id": "5d7a0b88afa0c6ee",
+    "id": "7466850b044c3070",
     "type": "debug",
-    "z": "2f7b12fa84740d20",
+    "z": "18074f7602d547cc",
     "name": "indicador EMERGENCIA",
     "active": true,
     "tosidebar": false,
@@ -234,5 +422,15 @@
     "willMsg": {},
     "userProps": "",
     "sessionExpiry": ""
+  },
+  {
+    "id": "e573d97058b2f511",
+    "type": "MySQLdatabase",
+    "name": "mysql-iot",
+    "host": "mysql",
+    "port": "3306",
+    "db": "iot_db",
+    "tz": "",
+    "charset": "UTF8"
   }
 ]
