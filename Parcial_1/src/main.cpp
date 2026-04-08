@@ -12,7 +12,7 @@
 
 const char *NOMBRE_ZONA = "Cocina-Principal";
 const char *DEVICE_ID = "ESP32-Cocina-01";
-const unsigned long PUBLISH_INTERVAL_MS = 5000;
+const unsigned long PUBLISH_INTERVAL_DEFAULT_MS = 5000;
 
 const char *ssid = WIFI_SSID;
 const char *password = WIFI_PASSWORD;
@@ -21,12 +21,65 @@ const int mqtt_port = MQTT_PORT;
 const char *mqtt_user = MQTT_USER;
 const char *mqtt_pass = MQTT_PASS;
 const char *topico_datos = TOPICO_DATOS;
+const char *topico_comandos = TOPICO_COMANDOS;
 
 DHT dht(DHTPIN, DHTTYPE);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 unsigned long lastPublishMs = 0;
+unsigned long publishIntervalMs = PUBLISH_INTERVAL_DEFAULT_MS;
+
+void mqttCallback(char *topic, byte *payload, unsigned int length)
+{
+  if (strcmp(topic, topico_comandos) != 0)
+  {
+    return;
+  }
+
+  if (length >= 256)
+  {
+    Serial.println("Comando demasiado largo, ignorado");
+    return;
+  }
+
+  char msg[256];
+  memcpy(msg, payload, length);
+  msg[length] = '\0';
+
+  StaticJsonDocument<256> doc;
+  DeserializationError err = deserializeJson(doc, msg);
+  if (err)
+  {
+    Serial.print("Comando JSON invalido: ");
+    Serial.println(err.c_str());
+    return;
+  }
+
+  const char *target = doc["device_id"] | "ALL";
+  if (strcmp(target, "ALL") != 0 && strcmp(target, DEVICE_ID) != 0)
+  {
+    return;
+  }
+
+  int intervaloSeg = doc["intervalo_seg"] | 0;
+  if (intervaloSeg < 1)
+  {
+    Serial.println("Comando sin intervalo valido, ignorado");
+    return;
+  }
+
+  if (intervaloSeg > 60)
+  {
+    intervaloSeg = 60;
+  }
+
+  publishIntervalMs = (unsigned long)intervaloSeg * 1000UL;
+
+  Serial.print("Intervalo actualizado por comando MQTT: ");
+  Serial.print(intervaloSeg);
+  Serial.println("s");
+}
 
 void setup_wifi()
 {
@@ -65,6 +118,9 @@ void reconnect()
     if (client.connect(clientId.c_str(), mqtt_user, mqtt_pass))
     {
       Serial.println(" conectado al broker MQTT");
+      client.subscribe(topico_comandos, 1);
+      Serial.print("Suscrito a comandos en: ");
+      Serial.println(topico_comandos);
     }
     else
     {
@@ -120,6 +176,7 @@ void setup()
   setup_wifi();
 
   client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(mqttCallback);
 }
 
 void loop()
@@ -131,7 +188,7 @@ void loop()
   client.loop();
 
   unsigned long nowMs = millis();
-  if (nowMs - lastPublishMs >= PUBLISH_INTERVAL_MS)
+  if (nowMs - lastPublishMs >= publishIntervalMs)
   {
     lastPublishMs = nowMs;
     publishSensorData();
