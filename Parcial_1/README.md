@@ -80,6 +80,7 @@ docker compose ps
 
 - La carga de `flows.json` es manual.
 - Pasos en Node-RED:
+
 1. Abre http://localhost:1880
 2. Menu (arriba derecha) -> Import
 3. Selecciona `flows.json`
@@ -138,12 +139,15 @@ Nota recomendada para carga controlada:
 ## Modelo de datos actual
 
 ### Tabla `mediciones_brutas`
+
 - Datos crudos recibidos del ESP32.
 
 ### Tabla `estados_medicion`
+
 - Estado calculado por Node-RED para cada medición (`NORMAL`, `ALERTA`, `EMERGENCIA`, `INVALIDO`).
 
 ### Tabla `eventos_actuadores`
+
 - Decisión de actuadores y motivo, asociada a la medición.
 - Usa una sola columna de estado (`estado_riesgo`) para el estado del evento en el momento.
 - Incluye `historial_reciente` con formato de 3 estados anteriores + estado actual.
@@ -176,6 +180,7 @@ LIMIT 20;
 Estas son las mismas consultas que disparan los botones `Inject` del flujo en Node-RED, listas para ejecutar directamente en DBeaver.
 
 ### 1) Botón: SELECT ultimas 20
+
 Muestra las ultimas 20 mediciones con su estado calculado.
 
 ```sql
@@ -197,6 +202,7 @@ LIMIT 20;
 ```
 
 ### 2) Botón: SELECT NORMAL
+
 Filtra las ultimas 20 mediciones cuyo estado es `NORMAL`.
 
 ```sql
@@ -219,6 +225,7 @@ LIMIT 20;
 ```
 
 ### 3) Botón: SELECT ALERTA
+
 Filtra las ultimas 20 mediciones cuyo estado es `ALERTA`.
 
 ```sql
@@ -241,6 +248,7 @@ LIMIT 20;
 ```
 
 ### 4) Botón: SELECT EMERGENCIA
+
 Filtra las ultimas 20 mediciones cuyo estado es `EMERGENCIA`.
 
 ```sql
@@ -263,6 +271,7 @@ LIMIT 20;
 ```
 
 ### 5) Botón: RESUMEN ALERTAS
+
 Resume cantidad de registros por severidad de alerta y fecha de ultima medicion para `ALERTA` y `EMERGENCIA`.
 
 ```sql
@@ -277,6 +286,7 @@ ORDER BY total DESC;
 ```
 
 ### 6) Botón: SELECT BRUTAS (ULTIMAS 20)
+
 Muestra solo datos crudos recibidos desde el dispositivo.
 
 ```sql
@@ -294,6 +304,7 @@ LIMIT 20;
 ```
 
 ### 7) Botón: SELECT ACTUADORES (ULTIMOS 20)
+
 Muestra decisiones de actuadores con estado del evento, motivo e historial.
 
 ```sql
