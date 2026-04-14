@@ -13,6 +13,84 @@ Proyecto de monitoreo IoT con arquitectura separada por responsabilidades:
 - Base de datos inicial: `docker/mysql/init.sql`
 - Orquestación Docker: `docker-compose.yml`
 
+## Validacion de requerimientos del proyecto
+
+1. Conexion del dispositivo a Internet
+
+Estado: Cumple.
+
+Implementacion:
+
+- El ESP32 se conecta por WiFi en modo estacion usando SSID y clave configurados en [include/config.h](include/config.h) y plantilla [include/config.example.h](include/config.example.h).
+- El firmware establece conectividad IP y sincroniza tiempo por NTP en [src/main.cpp](src/main.cpp).
+
+Protocolos usados:
+
+- IEEE 802.11 (WiFi): enlace inalambrico del ESP32 al router.
+- TCP/IP: transporte base para salida a Internet.
+- DNS: resolucion de maqiatto.com.
+- NTP: sincronizacion de fecha/hora (timestamp legible).
+- MQTT sobre TCP (puerto 1883): publicacion y suscripcion de datos/comandos.
+
+2. Broker, topico y envio desde nodo hardware
+
+Estado: Cumple.
+
+Implementacion:
+
+- Broker MQTT: Maqiatto (host maqiatto.com).
+- Topico de datos: correo/alertas (definido por variable TOPICO_DATOS).
+- Topico de comandos: correo/comandos (definido por variable TOPICO_COMANDOS).
+- El ESP32 publica JSON en el topico de datos y escucha comandos en el topico de comandos en [src/main.cpp](src/main.cpp).
+- Node-RED se conecta al mismo broker en [flows.json](flows.json).
+
+3. Procesamiento para estados, alertas y actuaciones
+
+Estado: Cumple.
+
+Implementacion:
+
+- Nodo Function de procesamiento en [flows.json](flows.json) (nombre: procesar estados (ESP32)).
+- Variables sensadas usadas: temperatura_C y mq135_aire.
+- Estados generados: NORMAL, ALERTA, EMERGENCIA e INVALIDO.
+- Actuaciones generadas: LED, extractor, sirena y valvula de gas.
+- Se calcula intervalo dinamico y se publica comando de ajuste al dispositivo cuando cambia el estado.
+
+4. Estructura de tablas para datos, estados y alertas
+
+Estado: Cumple.
+
+Implementacion en [docker/mysql/init.sql](docker/mysql/init.sql):
+
+- mediciones_brutas: datos sensados crudos.
+- estados_medicion: estado de riesgo derivado por cada medicion.
+- eventos_actuadores: alertas/actuaciones ejecutadas y su motivo.
+
+5. Servidor Node-RED para recepcion, procesamiento y almacenamiento
+
+Estado: Cumple.
+
+Implementacion:
+
+- Servicio nodered definido en [docker-compose.yml](docker-compose.yml).
+- Flujo completo de recepcion MQTT -> procesamiento -> inserciones MySQL en [flows.json](flows.json).
+- Persistencia en MySQL disponible en los nodos SQL del flujo y tablas de [docker/mysql/init.sql](docker/mysql/init.sql).
+
+6. Envio de datos desde dos nodos distintos con identificador propio
+
+Estado: Cumple.
+
+Implementacion:
+
+- Nodo 1 (hardware real): ESP32 con device_id fijo en [src/main.cpp](src/main.cpp).
+- Nodo 2 (simulado): agregado en Node-RED en [flows.json](flows.json) con:
+  - Inject periodico (cada 7s).
+  - Function generadora de payload.
+  - Publicacion MQTT al mismo topico de datos.
+  - device_id propio: SIM-Cocina-02.
+
+Con esto, ambos nodos quedan distinguidos en base de datos por el campo device_id.
+
 ## Requisitos
 
 1. Docker Desktop
