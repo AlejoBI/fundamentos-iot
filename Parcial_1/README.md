@@ -75,6 +75,7 @@ Implementacion:
 - Servicio nodered definido en [docker-compose.yml](docker-compose.yml).
 - Flujo completo de recepcion MQTT -> procesamiento -> inserciones MySQL en [flows.json](flows.json).
 - Persistencia en MySQL disponible en los nodos SQL del flujo y tablas de [docker/mysql/init.sql](docker/mysql/init.sql).
+- La aplicacion usa un unico procesador de estados y actuadores, y separa la depuracion de actuadores por `device_id` para cada cocina (hardware y simulada) en ramas distintas dentro del mismo flujo.
 
 6. Envio de datos desde dos nodos distintos con identificador propio
 
