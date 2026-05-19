@@ -9,6 +9,12 @@
 #define DHTPIN 33
 #define DHTTYPE DHT22
 #define PIN_MQ135 35
+#define LED_VERDE 25
+#define LED_AMARILLO 26
+#define LED_ROJO 27
+
+const float UMBRAL_TEMP = 28.0;
+const int UMBRAL_GAS = 3600;
 
 const char *NOMBRE_ZONA = "Cocina-Principal";
 const char *DEVICE_ID = "ESP32-Cocina-01";
@@ -131,6 +137,28 @@ void reconnect()
   }
 }
 
+void updateLEDs(float temperatura, int valorMQ135)
+{
+  if (temperatura >= UMBRAL_TEMP && valorMQ135 >= UMBRAL_GAS)
+  {
+    digitalWrite(LED_VERDE, LOW);
+    digitalWrite(LED_AMARILLO, LOW);
+    digitalWrite(LED_ROJO, HIGH);
+  }
+  else if (temperatura >= UMBRAL_TEMP || valorMQ135 >= UMBRAL_GAS)
+  {
+    digitalWrite(LED_VERDE, LOW);
+    digitalWrite(LED_AMARILLO, HIGH);
+    digitalWrite(LED_ROJO, LOW);
+  }
+  else
+  {
+    digitalWrite(LED_VERDE, HIGH);
+    digitalWrite(LED_AMARILLO, LOW);
+    digitalWrite(LED_ROJO, LOW);
+  }
+}
+
 void publishSensorData()
 {
   float temperatura = dht.readTemperature();
@@ -141,6 +169,8 @@ void publishSensorData()
     Serial.println("Lectura invalida de DHT22");
     return;
   }
+
+  updateLEDs(temperatura, valorMQ135);
 
   StaticJsonDocument<256> doc;
   doc["device_id"] = DEVICE_ID;
@@ -171,6 +201,10 @@ void setup()
 {
   Serial.begin(115200);
   Serial.println("Iniciando emisor de sensores IoT...");
+
+  pinMode(LED_VERDE, OUTPUT);
+  pinMode(LED_AMARILLO, OUTPUT);
+  pinMode(LED_ROJO, OUTPUT);
 
   dht.begin();
   setup_wifi();
