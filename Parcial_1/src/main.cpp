@@ -227,6 +227,4 @@ void loop()
     lastPublishMs = nowMs;
     publishSensorData();
   }
-
-  delay(100);
 }
