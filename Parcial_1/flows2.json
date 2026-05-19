@@ -1228,5 +1228,937 @@
     "x": 900,
     "y": 600,
     "wires": []
+  },
+  {
+    "id": "api1003",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/health",
+    "url": "/api/health",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1100,
+    "wires": [
+      [
+        "api1002"
+      ]
+    ]
+  },
+  {
+    "id": "api1002",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "health ok",
+    "func": "msg.payload = { ok: true, service: \"parcial1-api\" };\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1100,
+    "wires": [
+      [
+        "api1001"
+      ]
+    ]
+  },
+  {
+    "id": "api1001",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK health",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1100,
+    "wires": []
+  },
+  {
+    "id": "api1007",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/nodes",
+    "url": "/api/nodes",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1160,
+    "wires": [
+      [
+        "api1006"
+      ]
+    ]
+  },
+  {
+    "id": "api1006",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: get_nodes",
+    "func": "const estado = String(msg.payload && msg.payload.estado || msg.req && msg.req.query.estado || \"\").trim().toUpperCase();\nconst zona = String(msg.payload && msg.payload.zona || msg.req && msg.req.query.zona || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.payload && msg.payload.limit || msg.req && msg.req.query.limit || 50) || 50, 1), 200);\nconst offset = Math.max(Number(msg.payload && msg.payload.offset || msg.req && msg.req.query.offset || 0) || 0, 0);\nconst where = [];\nconst params = [];\nif (estado && [\"NORMAL\",\"ALERTA\",\"EMERGENCIA\",\"INVALIDO\"].includes(estado)) {\n  where.push(\"e.estado_riesgo = ?\"); params.push(estado);\n}\nif (zona) { where.push(\"m.zona = ?\"); params.push(zona); }\nconst whereSql = where.length ? \"WHERE \" + where.join(\" AND \") : \"\";\nmsg.topic = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, m.timestamp_origen, m.created_at, m.limpio, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.created_at AS motivo_created_at FROM mediciones_brutas m INNER JOIN (SELECT device_id, MAX(id) AS max_id FROM mediciones_brutas GROUP BY device_id) t ON m.device_id = t.device_id AND m.id = t.max_id LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores GROUP BY device_id) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id \" + whereSql + \" ORDER BY m.device_id LIMIT ? OFFSET ?\";\nmsg.payload = params.concat([limit, offset]);\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1160,
+    "wires": [
+      [
+        "api1005"
+      ]
+    ]
+  },
+  {
+    "id": "api1005",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1160,
+    "wires": [
+      [
+        "api1004"
+      ]
+    ]
+  },
+  {
+    "id": "api1004",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK nodes",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1160,
+    "wires": []
+  },
+  {
+    "id": "api1011",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/nodes/:id/latest",
+    "url": "/api/nodes/:id/latest",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1220,
+    "wires": [
+      [
+        "api1010"
+      ]
+    ]
+  },
+  {
+    "id": "api1010",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: get_node_latest",
+    "func": "const id = String(msg.req && msg.req.params && msg.req.params.id || \"\").trim();\nif (!id) { msg.payload = { error: \"device_id requerido\" }; return msg; }\nmsg.topic = \"SELECT m.*, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.created_at AS motivo_created_at FROM mediciones_brutas m LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores WHERE device_id = ?) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id WHERE m.device_id = ? ORDER BY m.timestamp_origen DESC, m.id DESC LIMIT 1\";\nmsg.payload = [id, id];\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1220,
+    "wires": [
+      [
+        "api1009"
+      ]
+    ]
+  },
+  {
+    "id": "api1009",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1220,
+    "wires": [
+      [
+        "api1008"
+      ]
+    ]
+  },
+  {
+    "id": "api1008",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK node latest",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1220,
+    "wires": []
+  },
+  {
+    "id": "api1015",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/nodes/:id/series",
+    "url": "/api/nodes/:id/series",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1280,
+    "wires": [
+      [
+        "api1014"
+      ]
+    ]
+  },
+  {
+    "id": "api1014",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: get_node_series",
+    "func": "const id = String(msg.req && msg.req.params && msg.req.params.id || \"\").trim();\nif (!id) { msg.payload = { error: \"device_id requerido\" }; return msg; }\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 50) || 50, 1), 2000);\nconst from = msg.req && (msg.req.query.from || \"\");\nconst to = msg.req && (msg.req.query.to || \"\");\nconst recent = msg.req && (msg.req.query.recent === \"1\" || msg.req.query.recent === \"true\" || (!from && !to));\nif (recent) {\n  msg.topic = \"SELECT * FROM (SELECT timestamp_origen, temperatura_c, mq135_aire, estado_riesgo, zona FROM vw_mediciones_estado WHERE device_id = ? ORDER BY timestamp_origen DESC, id DESC LIMIT ?) t ORDER BY timestamp_origen ASC\";\n  msg.payload = [id, limit];\n} else {\n  const fromDate = from || new Date(Date.now() - 86400000).toISOString();\n  const toDate = to || new Date().toISOString();\n  msg.topic = \"SELECT * FROM (SELECT timestamp_origen, temperatura_c, mq135_aire, estado_riesgo, zona FROM vw_mediciones_estado WHERE device_id = ? AND timestamp_origen BETWEEN ? AND ? ORDER BY timestamp_origen DESC, id DESC LIMIT ?) t ORDER BY timestamp_origen ASC\";\n  msg.payload = [id, fromDate.replace(\"T\",\" \").slice(0,19), toDate.replace(\"T\",\" \").slice(0,19), limit];\n}\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1280,
+    "wires": [
+      [
+        "api1013"
+      ]
+    ]
+  },
+  {
+    "id": "api1013",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1280,
+    "wires": [
+      [
+        "api1012"
+      ]
+    ]
+  },
+  {
+    "id": "api1012",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK series",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1280,
+    "wires": []
+  },
+  {
+    "id": "api1019",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/nodes/:id/incidencias",
+    "url": "/api/nodes/:id/incidencias",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1340,
+    "wires": [
+      [
+        "api1018"
+      ]
+    ]
+  },
+  {
+    "id": "api1018",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: get_node_incidencias",
+    "func": "const id = String(msg.req && msg.req.params && msg.req.params.id || \"\").trim();\nif (!id) { msg.payload = { error: \"device_id requerido\" }; return msg; }\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 20) || 20, 1), 200);\nmsg.topic = \"SELECT id, medicion_id, tipo_incidencia, detalle_incidencia, valor_detectado, created_at FROM incidencias WHERE device_id = ? ORDER BY created_at DESC LIMIT ?\";\nmsg.payload = [id, limit];\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1340,
+    "wires": [
+      [
+        "api1017"
+      ]
+    ]
+  },
+  {
+    "id": "api1017",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1340,
+    "wires": [
+      [
+        "api1016"
+      ]
+    ]
+  },
+  {
+    "id": "api1016",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK node incidencias",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1340,
+    "wires": []
+  },
+  {
+    "id": "api1024",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "POST /api/nodes/:id/state",
+    "url": "/api/nodes/:id/state",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1400,
+    "wires": [
+      [
+        "api1023"
+      ]
+    ]
+  },
+  {
+    "id": "api1023",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "build + publish state",
+    "func": "const id = String(msg.req && msg.req.params && msg.req.params.id || \"\").trim();\nif (!id) { msg.payload = { error: \"device_id requerido\" }; return [null, msg]; }\nconst estados = [\"NORMAL\",\"ALERTA\",\"EMERGENCIA\",\"LIBRE\",\"RESERVADA\",\"FUMIGACION\"];\nconst estadoBody = (msg.payload && msg.payload.estado || \"\").toString().toUpperCase();\nif (!estados.includes(estadoBody)) { msg.payload = { error: \"estado invalido\" }; return [null, msg]; }\nconst pld = { device_id: id, estado: estadoBody };\nmsg.topic = \"alejandro.bravo_isa@uao.edu.co/comandos\";\nmsg.payload = JSON.stringify(pld);\nmsg.mqttPayload = pld;\nreturn [msg, msg];",
+    "outputs": 2,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1400,
+    "wires": [
+      [
+        "api1022"
+      ],
+      [
+        "api1021"
+      ]
+    ]
+  },
+  {
+    "id": "api1022",
+    "type": "mqtt out",
+    "z": "fd207428a5fde675",
+    "name": "mqtt state",
+    "topic": "",
+    "qos": "",
+    "retain": "",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "fd407c03c80b70fc",
+    "x": 680,
+    "y": 1380,
+    "wires": []
+  },
+  {
+    "id": "api1021",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "format state response",
+    "func": "msg.payload = { ok: true, payload: msg.mqttPayload };\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1440,
+    "wires": [
+      [
+        "api1020"
+      ]
+    ]
+  },
+  {
+    "id": "api1020",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK state",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1400,
+    "wires": []
+  },
+  {
+    "id": "api1028",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/analysis/summary",
+    "url": "/api/analysis/summary",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1460,
+    "wires": [
+      [
+        "api1027"
+      ]
+    ]
+  },
+  {
+    "id": "api1027",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: summary",
+    "func": "msg.topic = \"SELECT (SELECT COUNT(*) FROM mediciones_brutas) AS total_brutas, (SELECT COUNT(*) FROM mediciones_brutas WHERE limpio = 0) AS total_pendientes, (SELECT COUNT(*) FROM mediciones_limpias) AS total_limpias, (SELECT COUNT(*) FROM incidencias) AS total_incidencias, (SELECT COUNT(*) FROM analisis_mediciones) AS total_analisis, (SELECT COUNT(*) FROM eventos_actuadores) AS total_eventos, (SELECT MAX(timestamp_origen) FROM mediciones_brutas) AS ultima_medicion, (SELECT MAX(created_at) FROM mediciones_limpias) AS ultima_limpia, (SELECT MAX(created_at) FROM incidencias) AS ultima_incidencia, (SELECT MAX(fecha_generacion) FROM analisis_mediciones) AS ultima_analisis, (SELECT MAX(created_at) FROM eventos_actuadores) AS ultimo_evento\";\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1460,
+    "wires": [
+      [
+        "api1026"
+      ]
+    ]
+  },
+  {
+    "id": "api1026",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1460,
+    "wires": [
+      [
+        "api2001"
+      ]
+    ]
+  },
+  {
+    "id": "api1025",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK summary",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1460,
+    "wires": []
+  },
+  {
+    "id": "api1032",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/analysis/brutas",
+    "url": "/api/analysis/brutas",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1520,
+    "wires": [
+      [
+        "api1031"
+      ]
+    ]
+  },
+  {
+    "id": "api1031",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: brutas",
+    "func": "const deviceId = String(msg.req && msg.req.query.device_id || \"\").trim();\nconst limpioParam = msg.req && msg.req.query.limpio;\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 20) || 20, 1), 200);\nconst where = []; const params = [];\nif (deviceId) { where.push(\"device_id = ?\"); params.push(deviceId); }\nif (limpioParam !== undefined) { const n = Number(limpioParam); if (n === 0 || n === 1) { where.push(\"limpio = ?\"); params.push(n); } }\nconst whereSql = where.length ? \"WHERE \" + where.join(\" AND \") : \"\";\nparams.push(limit);\nmsg.topic = \"SELECT id, device_id, zona, temperatura_c, mq135_aire, limpio, timestamp_origen, created_at FROM mediciones_brutas \" + whereSql + \" ORDER BY id DESC LIMIT ?\";\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1520,
+    "wires": [
+      [
+        "api1030"
+      ]
+    ]
+  },
+  {
+    "id": "api1030",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1520,
+    "wires": [
+      [
+        "api1029"
+      ]
+    ]
+  },
+  {
+    "id": "api1029",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK brutas",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1520,
+    "wires": []
+  },
+  {
+    "id": "api1036",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/analysis/limpias",
+    "url": "/api/analysis/limpias",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1580,
+    "wires": [
+      [
+        "api1035"
+      ]
+    ]
+  },
+  {
+    "id": "api1035",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: limpias",
+    "func": "const deviceId = String(msg.req && msg.req.query.device_id || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 20) || 20, 1), 200);\nconst params = [];\nconst whereSql = deviceId ? \"WHERE b.device_id = ?\" : \"\";\nif (deviceId) params.push(deviceId);\nparams.push(limit);\nmsg.topic = \"SELECT l.id, l.medicion_id, b.device_id, b.zona, e.estado_riesgo, l.temperatura_c, l.mq135_aire, b.timestamp_origen, l.created_at FROM mediciones_limpias l INNER JOIN mediciones_brutas b ON b.id = l.medicion_id LEFT JOIN estados_medicion e ON e.medicion_id = b.id \" + whereSql + \" ORDER BY l.id DESC LIMIT ?\";\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1580,
+    "wires": [
+      [
+        "api1034"
+      ]
+    ]
+  },
+  {
+    "id": "api1034",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1580,
+    "wires": [
+      [
+        "api1033"
+      ]
+    ]
+  },
+  {
+    "id": "api1033",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK limpias",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1580,
+    "wires": []
+  },
+  {
+    "id": "api1040",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/analysis/incidencias",
+    "url": "/api/analysis/incidencias",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1640,
+    "wires": [
+      [
+        "api1039"
+      ]
+    ]
+  },
+  {
+    "id": "api1039",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: incidencias",
+    "func": "const deviceId = String(msg.req && msg.req.query.device_id || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 20) || 20, 1), 200);\nconst params = [];\nconst whereSql = deviceId ? \"WHERE device_id = ?\" : \"\";\nif (deviceId) params.push(deviceId);\nparams.push(limit);\nmsg.topic = \"SELECT id, medicion_id, device_id, zona, tipo_incidencia, detalle_incidencia, valor_detectado, created_at FROM incidencias \" + whereSql + \" ORDER BY created_at DESC LIMIT ?\";\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1640,
+    "wires": [
+      [
+        "api1038"
+      ]
+    ]
+  },
+  {
+    "id": "api1038",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1640,
+    "wires": [
+      [
+        "api1037"
+      ]
+    ]
+  },
+  {
+    "id": "api1037",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK incidencias",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1640,
+    "wires": []
+  },
+  {
+    "id": "api1044",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/analysis/eventos",
+    "url": "/api/analysis/eventos",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1700,
+    "wires": [
+      [
+        "api1043"
+      ]
+    ]
+  },
+  {
+    "id": "api1043",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: eventos",
+    "func": "const deviceId = String(msg.req && msg.req.query.device_id || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 20) || 20, 1), 200);\nconst params = [];\nconst whereSql = deviceId ? \"WHERE device_id = ?\" : \"\";\nif (deviceId) params.push(deviceId);\nparams.push(limit);\nmsg.topic = \"SELECT id, medicion_id, device_id, estado_riesgo, motivo_activacion, historial_reciente, led_estado, extractor_estado, sirena_estado, valvula_gas_estado, created_at FROM eventos_actuadores \" + whereSql + \" ORDER BY id DESC LIMIT ?\";\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1700,
+    "wires": [
+      [
+        "api1042"
+      ]
+    ]
+  },
+  {
+    "id": "api1042",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1700,
+    "wires": [
+      [
+        "api1041"
+      ]
+    ]
+  },
+  {
+    "id": "api1041",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK eventos",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1700,
+    "wires": []
+  },
+  {
+    "id": "api1048",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/analysis/analisis",
+    "url": "/api/analysis/analisis",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1760,
+    "wires": [
+      [
+        "api1047"
+      ]
+    ]
+  },
+  {
+    "id": "api1047",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: analisis",
+    "func": "const deviceId = String(msg.req && msg.req.query.device_id || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 20) || 20, 1), 200);\nconst params = [];\nconst whereSql = deviceId ? \"WHERE device_id = ?\" : \"\";\nif (deviceId) params.push(deviceId);\nparams.push(limit);\nmsg.topic = \"SELECT * FROM analisis_mediciones \" + whereSql + \" ORDER BY fecha_generacion DESC, id DESC LIMIT ?\";\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1760,
+    "wires": [
+      [
+        "api1046"
+      ]
+    ]
+  },
+  {
+    "id": "api1046",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1760,
+    "wires": [
+      [
+        "api1045"
+      ]
+    ]
+  },
+  {
+    "id": "api1045",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK analisis",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1760,
+    "wires": []
+  },
+  {
+    "id": "api1052",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "GET /api/stream/latest",
+    "url": "/api/stream/latest",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1880,
+    "wires": [
+      [
+        "api1051"
+      ]
+    ]
+  },
+  {
+    "id": "api1051",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: stream_latest",
+    "func": "const estado = String(msg.req && msg.req.query.estado || \"\").trim().toUpperCase();\nconst zona = String(msg.req && msg.req.query.zona || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 200) || 200, 1), 200);\nconst offset = Math.max(Number(msg.req && msg.req.query.offset || 0) || 0, 0);\nconst where = []; const params = [];\nif (estado && [\"NORMAL\",\"ALERTA\",\"EMERGENCIA\",\"INVALIDO\"].includes(estado)) { where.push(\"e.estado_riesgo = ?\"); params.push(estado); }\nif (zona) { where.push(\"m.zona = ?\"); params.push(zona); }\nconst whereSql = where.length ? \"WHERE \" + where.join(\" AND \") : \"\";\nparams.push(limit); params.push(offset);\nmsg.topic = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, m.timestamp_origen, m.created_at, m.limpio, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.created_at AS motivo_created_at FROM mediciones_brutas m INNER JOIN (SELECT device_id, MAX(id) AS max_id FROM mediciones_brutas GROUP BY device_id) t ON m.device_id = t.device_id AND m.id = t.max_id LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores GROUP BY device_id) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id \" + whereSql + \" ORDER BY m.device_id LIMIT ? OFFSET ?\";\nmsg.payload = params;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1880,
+    "wires": [
+      [
+        "api1050"
+      ]
+    ]
+  },
+  {
+    "id": "api1050",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 1880,
+    "wires": [
+      [
+        "api1049"
+      ]
+    ]
+  },
+  {
+    "id": "api1049",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK stream",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 880,
+    "y": 1880,
+    "wires": []
+  },
+  {
+    "id": "api2001",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "format summary response",
+    "func": "const row = (Array.isArray(msg.payload) && msg.payload[0]) || msg.payload || {};\nif (row.id === undefined && Array.isArray(msg.payload) && msg.payload.length > 0) {\n  // Already formatted, pass through\n  return msg;\n}\nrow.calidad = [];\nrow.riesgos = [];\nrow.incidencias_por_tipo = [];\nrow.pendientes_muestra = [];\nmsg.payload = row;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 780,
+    "y": 1460,
+    "wires": [
+      [
+        "api1025"
+      ]
+    ]
+  },
+  {
+    "id": "api2002",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "POST /api/analysis/monthly",
+    "url": "/api/analysis/monthly",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 200,
+    "y": 1820,
+    "wires": [
+      [
+        "api2003"
+      ]
+    ]
+  },
+  {
+    "id": "api2003",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: monthly 30d",
+    "func": "msg.topic = \"SELECT b.device_id, b.zona, b.timestamp_origen, l.temperatura_c, l.mq135_aire FROM mediciones_limpias l INNER JOIN mediciones_brutas b ON b.id = l.medicion_id WHERE b.timestamp_origen >= DATE_SUB(NOW(), INTERVAL 30 DAY)\";\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 1820,
+    "wires": [
+      [
+        "api2004"
+      ]
+    ]
+  },
+  {
+    "id": "api2004",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql select 30d",
+    "x": 640,
+    "y": 1820,
+    "wires": [
+      [
+        "api2005"
+      ]
+    ]
+  },
+  {
+    "id": "api2005",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "compute monthly analysis",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nif (rows.length === 0) {\n    msg.payload = { ok: true, message: \"Sin datos para analizar en los ultimos 30 dias\", groups: 0 };\n    return msg;\n}\nfunction mean(arr) { if (!arr.length) return null; return arr.reduce((s, v) => s + v, 0) / arr.length; }\nfunction round(v, d) { return Number.isFinite(v) ? Number(v.toFixed(d || 2)) : null; }\nfunction toDate(r) { const dt = new Date(r); return Number.isFinite(dt.getTime()) ? dt : null; }\n\nconst byGroup = {};\nfor (const row of rows) {\n    const key = row.device_id + \"|\" + row.zona;\n    if (!byGroup[key]) byGroup[key] = [];\n    byGroup[key].push(row);\n}\n\nconst results = [];\nfor (const [key, group] of Object.entries(byGroup)) {\n    const [device_id, zona] = key.split(\"|\");\n    const temps = group.map(r => Number(r.temperatura_c)).filter(v => Number.isFinite(v));\n    const gases = group.map(r => Number(r.mq135_aire)).filter(v => Number.isFinite(v));\n    const timestamps = group.map(r => toDate(r.timestamp_origen)).filter(Boolean);\n    const minTs = timestamps.length ? new Date(Math.min(...timestamps)) : null;\n    const maxTs = timestamps.length ? new Date(Math.max(...timestamps)) : null;\n    const tAvg = temps.length ? mean(temps) : null;\n    const gAvg = gases.length ? mean(gases) : null;\n    results.push({\n        device_id, zona, periodo_dias: 30,\n        total_registros: group.length,\n        fecha_inicio_analisis: minTs, fecha_fin_analisis: maxTs,\n        temp_promedio: round(tAvg), mq135_promedio: round(gAvg)\n    });\n}\nmsg.payload = { ok: true, message: \"Analisis mensual completado para \" + results.length + \" grupo(s)\", groups: results.length, data: results };\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 880,
+    "y": 1820,
+    "wires": [
+      [
+        "api2006"
+      ]
+    ]
+  },
+  {
+    "id": "api2006",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK monthly",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 1100,
+    "y": 1820,
+    "wires": []
   }
 ]
