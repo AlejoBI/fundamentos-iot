@@ -26,12 +26,16 @@ services:
       TZ: America/Bogota
       MQTT_USER: ${MQTT_USER}
       MQTT_PASS: ${MQTT_PASS}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "1880:1880"
     volumes:
       - node_red_data:/data
+      - ./flows2.json:/data/flows.json:ro
 
   adminer:
     image: adminer:4.8.1
@@ -41,6 +45,61 @@ services:
       - mysql
     ports:
       - "8080:8080"
+
+  api:
+    image: node:20-alpine
+    container_name: iot-api
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - nodered
+    working_dir: /app
+    environment:
+      TZ: America/Bogota
+      PORT: 3001
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MQTT_SERVER: ${MQTT_SERVER}
+      MQTT_PORT: ${MQTT_PORT}
+      MQTT_USER: ${MQTT_USER}
+      MQTT_PASS: ${MQTT_PASS}
+      TOPICO_COMANDOS: ${TOPICO_COMANDOS}
+    volumes:
+      - ./api:/app
+    ports:
+      - "3001:3001"
+    command: sh -lc "npm install && npm run start"
+
+  simulator-cocina-01:
+    build: ./simulator
+    container_name: iot-sim-cocina-01
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SIM_DEVICE_ID: SIM-Cocina-01
+      SIM_ZONA: Cocina-Principal
+      SIM_TEMP_MIN: "21"
+      SIM_TEMP_MAX: "36"
+      SIM_MQ135_MIN: "100"
+      SIM_MQ135_MAX: "3500"
+
+  simulator-cocina-02:
+    build: ./simulator
+    container_name: iot-sim-cocina-02
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SIM_DEVICE_ID: SIM-Cocina-02
+      SIM_ZONA: Cocina-Simulada-02
+      SIM_TEMP_MIN: "20"
+      SIM_TEMP_MAX: "32"
+      SIM_MQ135_MIN: "150"
+      SIM_MQ135_MAX: "3000"
 
 volumes:
   mysql_data:

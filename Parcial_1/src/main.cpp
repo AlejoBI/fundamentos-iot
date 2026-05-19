@@ -139,13 +139,22 @@ void reconnect()
 
 void updateLEDs(float temperatura, int valorMQ135)
 {
-  if (temperatura >= UMBRAL_TEMP && valorMQ135 >= UMBRAL_GAS)
+  if (temperatura >= UMBRAL_TEMP)
   {
-    digitalWrite(LED_VERDE, LOW);
-    digitalWrite(LED_AMARILLO, LOW);
-    digitalWrite(LED_ROJO, HIGH);
+    if (valorMQ135 >= UMBRAL_GAS)
+    {
+      digitalWrite(LED_VERDE, LOW);
+      digitalWrite(LED_AMARILLO, LOW);
+      digitalWrite(LED_ROJO, HIGH);
+    }
+    else
+    {
+      digitalWrite(LED_VERDE, LOW);
+      digitalWrite(LED_AMARILLO, HIGH);
+      digitalWrite(LED_ROJO, LOW);
+    }
   }
-  else if (temperatura >= UMBRAL_TEMP || valorMQ135 >= UMBRAL_GAS)
+  else if (valorMQ135 >= UMBRAL_GAS)
   {
     digitalWrite(LED_VERDE, LOW);
     digitalWrite(LED_AMARILLO, HIGH);
@@ -163,14 +172,15 @@ void publishSensorData()
 {
   float temperatura = dht.readTemperature();
   int valorMQ135 = analogRead(PIN_MQ135);
+  bool lecturaValida = !isnan(temperatura);
 
-  if (isnan(temperatura))
+  updateLEDs(lecturaValida ? temperatura : 0, valorMQ135);
+
+  if (!lecturaValida)
   {
     Serial.println("Lectura invalida de DHT22");
     return;
   }
-
-  updateLEDs(temperatura, valorMQ135);
 
   StaticJsonDocument<256> doc;
   doc["device_id"] = DEVICE_ID;
@@ -205,6 +215,10 @@ void setup()
   pinMode(LED_VERDE, OUTPUT);
   pinMode(LED_AMARILLO, OUTPUT);
   pinMode(LED_ROJO, OUTPUT);
+
+  digitalWrite(LED_VERDE, HIGH);
+  digitalWrite(LED_AMARILLO, LOW);
+  digitalWrite(LED_ROJO, LOW);
 
   dht.begin();
   setup_wifi();

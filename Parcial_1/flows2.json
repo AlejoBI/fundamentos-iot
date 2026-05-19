@@ -1,6 +1,6 @@
 [
   {
-    "id": "0ae921cb7ec6b395",
+    "id": "fd207428a5fde675",
     "type": "tab",
     "label": "Flujo 1",
     "disabled": false,
@@ -8,93 +8,9 @@
     "env": []
   },
   {
-    "id": "8dbeb1943fd7e376",
-    "type": "inject",
-    "z": "0ae921cb7ec6b395",
-    "name": "simulador nodo 2 (cada 7s)",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "7",
-    "crontab": "",
-    "once": true,
-    "onceDelay": "2",
-    "topic": "",
-    "payload": "",
-    "payloadType": "date",
-    "x": 270,
-    "y": 100,
-    "wires": [["c500131d490a64c1"]]
-  },
-  {
-    "id": "c500131d490a64c1",
-    "type": "function",
-    "z": "0ae921cb7ec6b395",
-    "name": "generar payload simulado",
-    "func": "const now = new Date();\nconst ts = now.toISOString().slice(0, 19).replace(\"T\", \" \" );\n\nconst temperatura = 24 + (Math.random() * 8);\nlet gas = 2800 + Math.floor(Math.random() * 1200);\n\nif (temperatura > 29 || Math.random() > 0.82) {\n    gas = 3600 + Math.floor(Math.random() * 500);\n}\n\nmsg.payload = {\n    device_id: \"SIM-Cocina-02\",\n    zona: \"Cocina-Simulada-02\",\n    temperatura_C: Number(temperatura.toFixed(2)),\n    mq135_aire: gas,\n    timestamp: ts\n};\n\nreturn msg;",
-    "outputs": 1,
-    "timeout": "",
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 520,
-    "y": 100,
-    "wires": [["4da35261e16d343b", "bf3cf38f2cce19d8"]]
-  },
-  {
-    "id": "4da35261e16d343b",
-    "type": "json",
-    "z": "0ae921cb7ec6b395",
-    "name": "json string simulador",
-    "property": "payload",
-    "action": "str",
-    "pretty": false,
-    "x": 750,
-    "y": 100,
-    "wires": [["1114deedfc54c238"]]
-  },
-  {
-    "id": "1114deedfc54c238",
-    "type": "mqtt out",
-    "z": "0ae921cb7ec6b395",
-    "name": "mqtt out simulador nodo 2",
-    "topic": "alejandro.bravo_isa@uao.edu.co/alertas",
-    "qos": "1",
-    "retain": "false",
-    "respTopic": "",
-    "contentType": "",
-    "userProps": "",
-    "correl": "",
-    "expiry": "",
-    "broker": "fd407c03c80b70fc",
-    "x": 990,
-    "y": 100,
-    "wires": []
-  },
-  {
-    "id": "bf3cf38f2cce19d8",
-    "type": "debug",
-    "z": "0ae921cb7ec6b395",
-    "name": "debug simulador nodo 2",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 770,
-    "y": 60,
-    "wires": []
-  },
-  {
-    "id": "21e10653a865350a",
+    "id": "2acc93521fa78c96",
     "type": "mqtt in",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "alertas",
     "topic": "alejandro.bravo_isa@uao.edu.co/alertas",
     "qos": "2",
@@ -105,47 +21,82 @@
     "rh": 0,
     "inputs": 0,
     "x": 160,
-    "y": 270,
-    "wires": [["22f87ea37093b68c"]]
+    "y": 330,
+    "wires": [
+      [
+        "dcaf411322198648"
+      ]
+    ]
   },
   {
-    "id": "22f87ea37093b68c",
+    "id": "dcaf411322198648",
     "type": "json",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "parse json alertas",
     "property": "payload",
     "action": "obj",
     "pretty": false,
     "x": 350,
-    "y": 270,
-    "wires": [["2b22a9138112562a"]]
+    "y": 330,
+    "wires": [
+      [
+        "a1f5e6c7d8b9a0b1"
+      ]
+    ]
   },
   {
-    "id": "2b22a9138112562a",
+    "id": "a1f5e6c7d8b9a0b1",
     "type": "function",
-    "z": "0ae921cb7ec6b395",
-    "name": "procesar estados (ESP32)",
-    "func": "const UMBRAL_TEMP = 28.0;\nconst UMBRAL_GAS = 3600;\nconst INTERVALO_NORMAL_SEG = 6;\nconst INTERVALO_ALERTA_SEG = 3;\nconst INTERVALO_EMERGENCIA_SEG = 1;\nconst TOPICO_COMANDOS = \"alejandro.bravo_isa@uao.edu.co/comandos\";\n\nconst p = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\n\nfunction toNumber(v) {\n    if (v === null || v === undefined || v === \"\") return NaN;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : NaN;\n}\n\nconst temperatura = toNumber(p.temperatura_C ?? p.temperatura ?? p.temp);\nconst gas = toNumber(p.mq135_aire ?? p.gas ?? p.mq135);\n\nlet estado = \"\";\nlet detalle = \"\";\nlet motivoActuadores = \"\";\nlet intervaloSeg = INTERVALO_NORMAL_SEG;\nlet acciones = {\n    led: \"VERDE\",\n    extractor: \"APAGADO\",\n    sirena: \"APAGADA\",\n    valvula_gas: \"ABIERTA\"\n};\n\nif (Number.isFinite(temperatura) && Number.isFinite(gas)) {\n    const temperaturaAlta = temperatura >= UMBRAL_TEMP;\n    const gasAlto = gas >= UMBRAL_GAS;\n\n    if (temperaturaAlta && gasAlto) {\n        estado = \"EMERGENCIA\";\n        intervaloSeg = INTERVALO_EMERGENCIA_SEG;\n        detalle = \"Temperatura y gas altos\";\n        motivoActuadores = \"Activacion por temperatura y gas altos\";\n        acciones = {\n            led: \"ROJO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"ENCENDIDA\",\n            valvula_gas: \"CERRADA\"\n        };\n    } else if (temperaturaAlta) {\n        estado = \"ALERTA\";\n        intervaloSeg = INTERVALO_ALERTA_SEG;\n        detalle = \"Temperatura alta\";\n        motivoActuadores = \"Activacion por temperatura fuera de rango\";\n        acciones = {\n            led: \"AMARILLO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    } else if (gasAlto) {\n        estado = \"ALERTA\";\n        intervaloSeg = INTERVALO_ALERTA_SEG;\n        detalle = \"Gas alto\";\n        motivoActuadores = \"Activacion por gas fuera de rango\";\n        acciones = {\n            led: \"AMARILLO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    } else {\n        estado = \"NORMAL\";\n        intervaloSeg = INTERVALO_NORMAL_SEG;\n        detalle = \"Valores dentro de rango\";\n        motivoActuadores = \"Sin activacion, condiciones normales\";\n        acciones = {\n            led: \"VERDE\",\n            extractor: \"APAGADO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    }\n} else {\n    estado = String(p.estado_riesgo || \"INVALIDO\").toUpperCase();\n    detalle = \"No llegaron temperatura_C y mq135_aire; se conserva estado recibido\";\n    motivoActuadores = \"Datos incompletos\";\n}\n\nmsg.payload.temperatura_C = Number.isFinite(temperatura) ? temperatura : p.temperatura_C;\nmsg.payload.mq135_aire = Number.isFinite(gas) ? gas : p.mq135_aire;\nmsg.payload.estado_riesgo = estado;\nmsg.payload.tiempo_espera_seg = intervaloSeg;\nmsg.payload.detalle_estado = detalle;\nmsg.payload.motivo_actuadores = motivoActuadores;\nmsg.payload.actuadores = acciones;\n\nconst deviceIdHist = String(msg.payload.device_id || \"ALL\");\nconst histKey = `hist_estados_${deviceIdHist}`;\nconst historialPrevio = context.get(histKey) || [];\nconst historialRecortado = historialPrevio.slice(-3);\nconst historialFinal = [...historialRecortado, estado];\ncontext.set(histKey, historialFinal);\nmsg.payload.historial_reciente = historialFinal.join(\">\");\n\nif (estado === \"NORMAL\") {\n    node.status({ fill: \"green\", shape: \"dot\", text: `NORMAL | ${intervaloSeg}s` });\n} else if (estado === \"ALERTA\") {\n    node.status({ fill: \"yellow\", shape: \"dot\", text: `ALERTA | ${intervaloSeg}s` });\n} else if (estado === \"EMERGENCIA\") {\n    node.status({ fill: \"red\", shape: \"dot\", text: `EMERGENCIA | ${intervaloSeg}s` });\n} else {\n    node.status({ fill: \"grey\", shape: \"ring\", text: estado });\n}\n\nconst resumen = {\n    topic: msg.topic,\n    payload: {\n        device_id: msg.payload.device_id || \"N/A\",\n        estado: estado,\n        temperatura_C: msg.payload.temperatura_C,\n        mq135_aire: msg.payload.mq135_aire,\n        detalle: detalle,\n        motivo_actuadores: motivoActuadores,\n        actuadores: acciones,\n        intervalo_envio_seg: intervaloSeg,\n        timestamp: msg.payload.timestamp || null\n    }\n};\n\nconst deviceId = String(msg.payload.device_id || \"ALL\");\nconst estadoKey = `estado_prev_${deviceId}`;\nconst estadoPrev = context.get(estadoKey);\nlet comando = null;\n\nif ([\"NORMAL\", \"ALERTA\", \"EMERGENCIA\"].includes(estado) && estado !== estadoPrev) {\n    context.set(estadoKey, estado);\n    comando = {\n        topic: TOPICO_COMANDOS,\n        payload: JSON.stringify({\n            device_id: deviceId,\n            estado: estado,\n            intervalo_seg: intervaloSeg\n        }),\n        qos: \"1\",\n        retain: false\n    };\n}\n\nreturn [msg, resumen, comando];",
+    "z": "fd207428a5fde675",
+    "name": "validar + normalizar payload",
+    "func": "const p = msg.payload || {};\n\nif (typeof p !== \"object\" || p === null || Array.isArray(p)) {\n    msg.error = \"payload no es un objeto JSON valido\";\n    return [null, msg];\n}\n\nfunction toNumberOrNull(v) {\n    if (v === null || v === undefined || v === \"\") return null;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : null;\n}\n\nfunction normalizeTimestamp(raw) {\n    if (raw === null || raw === undefined || raw === \"\") return null;\n\n    if (typeof raw === \"number\" && Number.isFinite(raw)) {\n        const epoch = raw < 1e12 ? raw * 1000 : raw;\n        const dt = new Date(epoch);\n        return Number.isFinite(dt.getTime()) ? dt.toISOString() : null;\n    }\n\n    if (typeof raw === \"string\") {\n        const value = raw.trim();\n        if (!value) return null;\n\n        if (/^\\d+$/.test(value)) {\n            const epoch = Number(value);\n            if (Number.isFinite(epoch)) {\n                const ms = epoch < 1e12 ? epoch * 1000 : epoch;\n                const dtEpoch = new Date(ms);\n                return Number.isFinite(dtEpoch.getTime()) ? dtEpoch.toISOString() : null;\n            }\n        }\n\n        const parsed = Date.parse(value);\n        if (Number.isFinite(parsed)) {\n            return new Date(parsed).toISOString();\n        }\n    }\n\n    return null;\n}\n\nfunction clamp(v, lo, hi) {\n    return Math.max(lo, Math.min(hi, v));\n}\n\nfunction mapRawToPpm(raw, inMin, inMax, outMax) {\n    const x = clamp(Number(raw), inMin, inMax);\n    const ratio = (x - inMin) / Math.max(1, (inMax - inMin));\n    return ratio * outMax;\n}\n\nconst deviceIdRaw = String(p.device_id ?? p.deviceId ?? \"\").trim();\nconst zonaRaw = String(p.zona ?? p.zone ?? \"\").trim();\nconst deviceId = deviceIdRaw || \"ESP32\";\nconst zona = zonaRaw || \"N/A\";\n\nconst temp = toNumberOrNull(p.temperatura_C ?? p.temperatura_c ?? p.temperatura ?? p.temp);\nconst gasRaw = toNumberOrNull(p.mq135_aire ?? p.gas ?? p.mq135);\n\nconst tsIso = normalizeTimestamp(p.timestamp ?? p.timestamp_origen ?? p.ts);\n\nconst TEMP_MIN_C = -20;\nconst TEMP_MAX_C = 80;\nconst MQ135_RAW_MIN = 0;\nconst MQ135_RAW_MAX = 4095;\nconst MQ135_PPM_MAX = 120;\n\nconst errors = [];\nconst categories = new Set();\n\nfunction addError(code, category) {\n    if (code && !errors.includes(code)) {\n        errors.push(code);\n    }\n    if (category) categories.add(category);\n}\n\nif (!deviceIdRaw) {\n    addError(\"device_id_faltante\", \"INCOMPLETO\");\n}\nif (!zonaRaw) {\n    addError(\"zona_faltante\", \"INCOMPLETO\");\n}\nif (!tsIso) {\n    addError(\"timestamp_invalido\", \"FORMATO\");\n}\n\nif (temp === null) {\n    addError(\"temperatura_incompleta\", \"INCOMPLETO\");\n} else if (temp < TEMP_MIN_C || temp > TEMP_MAX_C) {\n    addError(\"temperatura_fuera_rango\", \"ATIPICO\");\n}\n\nif (gasRaw === null) {\n    addError(\"mq135_incompleto\", \"INCOMPLETO\");\n} else if (gasRaw < MQ135_RAW_MIN || gasRaw > MQ135_RAW_MAX) {\n    addError(\"mq135_fuera_rango\", \"ATIPICO\");\n}\n\nconst gasPpm = Number.isFinite(gasRaw) ? mapRawToPpm(gasRaw, MQ135_RAW_MIN, MQ135_RAW_MAX, MQ135_PPM_MAX) : null;\n\nlet tipo = \"OK\";\nif (errors.length) {\n    const cats = Array.from(categories);\n    tipo = cats.length > 1 ? \"MULTIPLE\" : (cats[0] || \"ERROR\");\n}\n\nmsg.payload = {\n    device_id: deviceId,\n    zona,\n    temperatura_C: temp,\n    mq135_aire: gasRaw,\n    mq135_ppm: gasPpm,\n    timestamp: tsIso || p.timestamp\n};\n\nmsg.validation = {\n    hasErrors: errors.length > 0,\n    tipo,\n    errors,\n    detalle: errors.join(\"; \"),\n    valor: {\n        temperatura_C: temp,\n        mq135_aire: gasRaw,\n        timestamp: tsIso || p.timestamp\n    }\n};\n\nreturn [msg, null];",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 560,
+    "y": 330,
+    "wires": [
+      [
+        "338f8775fac15675"
+      ]
+    ]
+  },
+  {
+    "id": "338f8775fac15675",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "procesar estados",
+    "func": "const UMBRAL_TEMP = 28.0;\nconst UMBRAL_GAS = 3600;\nconst INTERVALO_NORMAL_SEG = 6;\nconst INTERVALO_ALERTA_SEG = 3;\nconst INTERVALO_EMERGENCIA_SEG = 1;\nconst TOPICO_COMANDOS = \"alejandro.bravo_isa@uao.edu.co/comandos\";\n\nconst p = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\nconst validation = msg.validation || {};\n\nfunction toNumber(v) {\n    if (v === null || v === undefined || v === \"\") return NaN;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : NaN;\n}\n\nconst temperatura = toNumber(p.temperatura_C ?? p.temperatura ?? p.temp);\nconst gasRaw = toNumber(p.mq135_aire ?? p.gas ?? p.mq135);\nconst gasPpm = toNumber(p.mq135_ppm);\n\nlet estado = \"\";\nlet detalle = \"\";\nlet motivoActuadores = \"\";\nlet intervaloSeg = INTERVALO_NORMAL_SEG;\nlet acciones = {\n    led: \"VERDE\",\n    extractor: \"APAGADO\",\n    sirena: \"APAGADA\",\n    valvula_gas: \"ABIERTA\"\n};\n\nif (!validation.hasErrors && Number.isFinite(temperatura) && Number.isFinite(gasRaw)) {\n    const temperaturaAlta = temperatura >= UMBRAL_TEMP;\n    const gasReferencia = gasRaw;\n    const gasAlto = gasReferencia >= UMBRAL_GAS;\n\n    if (temperaturaAlta) {\n        if (gasAlto) {\n            estado = \"EMERGENCIA\";\n            intervaloSeg = INTERVALO_EMERGENCIA_SEG;\n            detalle = \"Temperatura y gas altos\";\n            motivoActuadores = \"Activacion por temperatura y gas altos\";\n            acciones = {\n                led: \"ROJO\",\n                extractor: \"ENCENDIDO\",\n                sirena: \"ENCENDIDA\",\n                valvula_gas: \"CERRADA\"\n            };\n        } else {\n            estado = \"ALERTA\";\n            intervaloSeg = INTERVALO_ALERTA_SEG;\n            detalle = \"Temperatura alta\";\n            motivoActuadores = \"Activacion por temperatura fuera de rango\";\n            acciones = {\n                led: \"AMARILLO\",\n                extractor: \"ENCENDIDO\",\n                sirena: \"APAGADA\",\n                valvula_gas: \"ABIERTA\"\n            };\n        }\n    } else if (gasAlto) {\n        estado = \"ALERTA\";\n        intervaloSeg = INTERVALO_ALERTA_SEG;\n        detalle = \"Gas alto\";\n        motivoActuadores = \"Activacion por gas fuera de rango\";\n        acciones = {\n            led: \"AMARILLO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    } else {\n        estado = \"NORMAL\";\n        intervaloSeg = INTERVALO_NORMAL_SEG;\n        detalle = \"Valores dentro de rango\";\n        motivoActuadores = \"Sistema estable\";\n        acciones = {\n            led: \"VERDE\",\n            extractor: \"APAGADO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    }\n} else {\n    estado = \"INVALIDO\";\n    detalle = validation.detalle || \"Datos incompletos\";\n    motivoActuadores = \"Datos invalidos, sin accion\";\n}\n\nconst ts = String(p.timestamp || \"\");\n\nmsg.payload = {\n    ...p,\n    estado_riesgo: estado,\n    detalle_estado: detalle,\n    tiempo_espera_seg: intervaloSeg,\n    motivo_actuadores: motivoActuadores,\n    historial_reciente: estado,\n    actuadores: acciones,\n    timestamp: ts\n};\n\nif (estado === \"INVALIDO\") {\n    return [msg, null, null];\n}\n\nconst comando = {\n    topic: TOPICO_COMANDOS,\n    payload: JSON.stringify({\n        device_id: p.device_id || \"ALL\",\n        estado: estado,\n        intervalo_seg: intervaloSeg,\n        actuadores: acciones\n    })\n};\n\nreturn [msg, msg, comando];",
     "outputs": 3,
     "timeout": "",
     "noerr": 0,
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "x": 600,
-    "y": 270,
+    "x": 780,
+    "y": 330,
     "wires": [
-      ["f763f562a6d47815"],
-      ["3dede9491dd8b343"],
-      ["ee9345be81ff4577", "a4fd53edb295f7f8"]
+      [
+        "1c60fb02dd9a541f"
+      ],
+      [
+        "3dede9491dd8b343"
+      ],
+      [
+        "21f3b76329d7ad2e",
+        "708650f467981d98"
+      ]
     ]
   },
   {
-    "id": "f763f562a6d47815",
+    "id": "1c60fb02dd9a541f",
     "type": "function",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "build SQL insert bruta",
-    "func": "const p = msg.payload || {};\n\nconst temp = Number(p.temperatura_C);\nconst gas = Number(p.mq135_aire);\nif (!Number.isFinite(temp) || !Number.isFinite(gas)) {\n    return null;\n}\n\nconst deviceId = String(p.device_id || \"ESP32\");\nconst zona = String(p.zona || \"N/A\");\nconst estado = String(p.estado_riesgo || \"INVALIDO\").toUpperCase();\nconst detalle = String(p.detalle_estado || \"\");\nconst motivoActuadores = String(p.motivo_actuadores || \"Sin motivo\");\nconst historialReciente = String(p.historial_reciente || estado);\nconst espera = Number(p.tiempo_espera_seg);\nconst tiempoEspera = Number.isFinite(espera) ? Number(espera.toFixed(2)) : null;\nlet ts = String(p.timestamp || \"\");\n\nif (!ts) {\n    const now = new Date();\n    ts = now.toISOString().slice(0, 19).replace(\"T\", \" \" );\n}\n\nmsg.deviceId = deviceId;\nmsg.estadoRiesgo = estado;\nmsg.detalleEstado = detalle;\nmsg.tiempoEspera = tiempoEspera;\nmsg.motivoActuadores = motivoActuadores;\nmsg.historialReciente = historialReciente;\nmsg.actuadores = p.actuadores || {};\n\nmsg.topic = \"INSERT INTO mediciones_brutas (device_id, zona, temperatura_c, mq135_aire, timestamp_origen) VALUES (?, ?, ?, ?, ?)\";\nmsg.payload = [\n    deviceId,\n    zona,\n    Number(temp.toFixed(2)),\n    Math.round(gas),\n    ts\n];\nmsg.queryType = \"insert_bruta\";\n\nreturn msg;",
+    "func": "const p = msg.payload || {};\n\nfunction toNumberOrDefault(v, def = 0) {\n    const n = Number(v);\n    return Number.isFinite(n) ? n : def;\n}\n\nconst temp = toNumberOrDefault(p.temperatura_C, 0);\nconst gas = toNumberOrDefault(p.mq135_aire, 0);\n\nconst deviceId = String(p.device_id || \"ESP32\");\nconst zona = String(p.zona || \"N/A\");\nconst estado = String(p.estado_riesgo || \"INVALIDO\").toUpperCase();\nconst detalle = String(p.detalle_estado || \"\");\nconst motivoActuadores = String(p.motivo_actuadores || \"Sin motivo\");\nconst historialReciente = String(p.historial_reciente || estado);\nconst espera = Number(p.tiempo_espera_seg);\nconst tiempoEspera = Number.isFinite(espera) ? Number(espera.toFixed(2)) : null;\nlet ts = String(p.timestamp || \"\");\n\nif (ts) {\n    ts = ts.replace(\"T\", \" \").replace(/[.]\\d+Z$/, \"\").replace(/Z$/, \"\");\n} else {\n    const now = new Date();\n    ts = now.toISOString().slice(0, 19).replace(\"T\", \" \");\n}\n\nmsg.deviceId = deviceId;\nmsg.zona = zona;\nmsg.estadoRiesgo = estado;\nmsg.detalleEstado = detalle;\nmsg.tiempoEspera = tiempoEspera;\nmsg.motivoActuadores = motivoActuadores;\nmsg.historialReciente = historialReciente;\nmsg.actuadores = p.actuadores || {};\n\nmsg.topic = \"INSERT INTO mediciones_brutas (device_id, zona, temperatura_c, mq135_aire, timestamp_origen) VALUES (?, ?, ?, ?, ?)\";\nmsg.payload = [\n    deviceId,\n    zona,\n    Number(temp.toFixed(2)),\n    Math.round(gas),\n    ts\n];\nmsg.queryType = \"insert_bruta\";\n\nreturn msg;",
     "outputs": 1,
     "timeout": "",
     "noerr": 0,
@@ -153,13 +104,17 @@
     "finalize": "",
     "libs": [],
     "x": 760,
-    "y": 440,
-    "wires": [["dca3b24a91085534"]]
+    "y": 500,
+    "wires": [
+      [
+        "7e94b8ae46bee072"
+      ]
+    ]
   },
   {
-    "id": "f8ea723cc2bc635b",
+    "id": "caa61ebfb80f14e1",
     "type": "function",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "build SQL insert estado",
     "func": "const medicionId = Number(msg.payload && msg.payload.insertId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\n\nmsg.medicionId = medicionId;\nmsg.topic = \"INSERT INTO estados_medicion (medicion_id, estado_riesgo, detalle_estado, tiempo_espera_seg) VALUES (?, ?, ?, ?)\";\nmsg.payload = [\n    medicionId,\n    String(msg.estadoRiesgo || \"INVALIDO\").toUpperCase(),\n    String(msg.detalleEstado || \"\"),\n    msg.tiempoEspera\n];\nmsg.queryType = \"insert_estado\";\nreturn msg;",
     "outputs": 1,
@@ -169,13 +124,17 @@
     "finalize": "",
     "libs": [],
     "x": 770,
-    "y": 480,
-    "wires": [["dca3b24a91085534"]]
+    "y": 540,
+    "wires": [
+      [
+        "7e94b8ae46bee072"
+      ]
+    ]
   },
   {
-    "id": "240b2d8068f981ea",
+    "id": "53dc717f967b02c7",
     "type": "function",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "build SQL insert actuadores",
     "func": "const medicionId = Number(msg.medicionId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\n\nconst a = msg.actuadores || {};\nconst estado = String(msg.estadoRiesgo || \"INVALIDO\").toUpperCase();\nconst historialReciente = String(msg.historialReciente || estado);\n\nmsg.topic = \"INSERT INTO eventos_actuadores (medicion_id, device_id, estado_riesgo, motivo_activacion, historial_reciente, led_estado, extractor_estado, sirena_estado, valvula_gas_estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\";\nmsg.payload = [\n    medicionId,\n    String(msg.deviceId || \"ESP32\"),\n    estado,\n    String(msg.motivoActuadores || \"Sin motivo\"),\n    historialReciente,\n    String(a.led || \"N/A\"),\n    String(a.extractor || \"N/A\"),\n    String(a.sirena || \"N/A\"),\n    String(a.valvula_gas || \"N/A\")\n];\nmsg.queryType = \"insert_actuador\";\nreturn msg;",
     "outputs": 1,
@@ -185,13 +144,17 @@
     "finalize": "",
     "libs": [],
     "x": 780,
-    "y": 520,
-    "wires": [["dca3b24a91085534"]]
+    "y": 580,
+    "wires": [
+      [
+        "7e94b8ae46bee072"
+      ]
+    ]
   },
   {
-    "id": "280c86b4c143abc4",
+    "id": "6cacd2c36ce11269",
     "type": "inject",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "SELECT ultimas 20",
     "props": [
       {
@@ -204,14 +167,18 @@
     "onceDelay": 0.1,
     "payload": "",
     "payloadType": "date",
-    "x": 320,
-    "y": 550,
-    "wires": [["36d294dd3d7fc199"]]
+    "x": 290,
+    "y": 500,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
   },
   {
-    "id": "0761efe88fe2a347",
+    "id": "12954685e31d323b",
     "type": "inject",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "SELECT EMERGENCIA",
     "props": [
       {
@@ -224,14 +191,18 @@
     "onceDelay": 0.1,
     "payload": "EMERGENCIA",
     "payloadType": "str",
-    "x": 330,
-    "y": 600,
-    "wires": [["36d294dd3d7fc199"]]
+    "x": 300,
+    "y": 550,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
   },
   {
-    "id": "7f15449ad1f2682c",
+    "id": "f6c0e72a16640d7f",
     "type": "inject",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "SELECT ALERTA",
     "props": [
       {
@@ -244,14 +215,18 @@
     "onceDelay": 0.1,
     "payload": "ALERTA",
     "payloadType": "str",
-    "x": 320,
-    "y": 650,
-    "wires": [["36d294dd3d7fc199"]]
+    "x": 290,
+    "y": 600,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
   },
   {
-    "id": "431bf11ecee0cbf4",
+    "id": "a7d822347dd11598",
     "type": "inject",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "SELECT NORMAL",
     "props": [
       {
@@ -264,14 +239,18 @@
     "onceDelay": 0.1,
     "payload": "NORMAL",
     "payloadType": "str",
-    "x": 320,
-    "y": 700,
-    "wires": [["36d294dd3d7fc199"]]
+    "x": 290,
+    "y": 650,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
   },
   {
-    "id": "bc7fb6bb733b6f28",
+    "id": "1b0160036c38b4e6",
     "type": "inject",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "RESUMEN ALERTAS",
     "props": [
       {
@@ -284,14 +263,18 @@
     "onceDelay": 0.1,
     "payload": "RESUMEN_ALERTAS",
     "payloadType": "str",
-    "x": 340,
-    "y": 760,
-    "wires": [["36d294dd3d7fc199"]]
+    "x": 310,
+    "y": 710,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
   },
   {
-    "id": "edecdad222f9e09d",
+    "id": "e4d9181acebb1dad",
     "type": "inject",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "SELECT BRUTAS (ULTIMAS 20)",
     "props": [
       {
@@ -304,14 +287,18 @@
     "onceDelay": 0.1,
     "payload": "BRUTAS_RECIENTES",
     "payloadType": "str",
-    "x": 360,
-    "y": 810,
-    "wires": [["36d294dd3d7fc199"]]
+    "x": 330,
+    "y": 760,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
   },
   {
-    "id": "eb02b22c71c90b33",
+    "id": "8f5b3ce2351cf38c",
     "type": "inject",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "SELECT ACTUADORES (ULTIMOS 20)",
     "props": [
       {
@@ -324,16 +311,116 @@
     "onceDelay": 0.1,
     "payload": "ACTUADORES_RECIENTES",
     "payloadType": "str",
-    "x": 370,
-    "y": 860,
-    "wires": [["36d294dd3d7fc199"]]
+    "x": 340,
+    "y": 810,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
   },
   {
-    "id": "36d294dd3d7fc199",
+    "id": "c7b2f1d4a6e83910",
+    "type": "inject",
+    "z": "fd207428a5fde675",
+    "name": "SELECT LIMPIAS (ULTIMAS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "LIMPIAS_RECIENTES",
+    "payloadType": "str",
+    "x": 350,
+    "y": 860,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
+  },
+  {
+    "id": "e0a3c5d8f1b24799",
+    "type": "inject",
+    "z": "fd207428a5fde675",
+    "name": "SELECT INCIDENCIAS (ULTIMAS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "INCIDENCIAS_RECIENTES",
+    "payloadType": "str",
+    "x": 380,
+    "y": 900,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
+  },
+  {
+    "id": "f3d8a0b9c2e14421",
+    "type": "inject",
+    "z": "fd207428a5fde675",
+    "name": "SELECT ANALISIS (ULTIMOS 20)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "ANALISIS_RECIENTES",
+    "payloadType": "str",
+    "x": 370,
+    "y": 940,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
+  },
+  {
+    "id": "a6c9d2e0b1f35487",
+    "type": "inject",
+    "z": "fd207428a5fde675",
+    "name": "RESUMEN CALIDAD",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "payload": "RESUMEN_CALIDAD",
+    "payloadType": "str",
+    "x": 290,
+    "y": 980,
+    "wires": [
+      [
+        "dd578be604318377"
+      ]
+    ]
+  },
+  {
+    "id": "dd578be604318377",
     "type": "function",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "build SQL select",
-    "func": "const token = String(msg.payload || \"\").trim().toUpperCase();\nconst baseJoin = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, m.timestamp_origen, m.created_at FROM mediciones_brutas m INNER JOIN estados_medicion e ON e.medicion_id = m.id\";\n\nif ([\"NORMAL\", \"ALERTA\", \"EMERGENCIA\"].includes(token)) {\n    msg.topic = `${baseJoin} WHERE e.estado_riesgo='${token}' ORDER BY m.id DESC LIMIT 20;`;\n} else if (token === \"RESUMEN_ALERTAS\") {\n    msg.topic = \"SELECT estado_riesgo, COUNT(*) AS total, MAX(created_at) AS ultima_medicion FROM estados_medicion WHERE estado_riesgo IN ('ALERTA','EMERGENCIA') GROUP BY estado_riesgo ORDER BY total DESC;\";\n} else if (token === \"BRUTAS_RECIENTES\") {\n    msg.topic = \"SELECT id, device_id, zona, temperatura_c, mq135_aire, timestamp_origen, created_at FROM mediciones_brutas ORDER BY id DESC LIMIT 20;\";\n} else if (token === \"ACTUADORES_RECIENTES\") {\n    msg.topic = \"SELECT id, medicion_id, device_id, estado_riesgo, motivo_activacion, historial_reciente, led_estado, extractor_estado, sirena_estado, valvula_gas_estado, created_at FROM eventos_actuadores ORDER BY id DESC LIMIT 20;\";\n} else {\n    msg.topic = `${baseJoin} ORDER BY m.id DESC LIMIT 20;`;\n}\n\nmsg.queryType = \"select\";\nmsg.payload = [];\nreturn msg;",
+    "func": "const token = String(msg.payload || \"\").trim().toUpperCase();\nconst baseJoin = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, m.limpio, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, m.timestamp_origen, m.created_at FROM mediciones_brutas m LEFT JOIN estados_medicion e ON e.medicion_id = m.id\";\n\nif ([\"NORMAL\", \"ALERTA\", \"EMERGENCIA\"].includes(token)) {\n    msg.topic = baseJoin + \" WHERE e.estado_riesgo='\" + token + \"' ORDER BY m.id DESC LIMIT 20;\";\n} else if (token === \"RESUMEN_ALERTAS\") {\n    msg.topic = \"SELECT estado_riesgo, COUNT(*) AS total, MAX(created_at) AS ultima_medicion FROM estados_medicion WHERE estado_riesgo IN ('ALERTA','EMERGENCIA') GROUP BY estado_riesgo ORDER BY total DESC;\";\n} else if (token === \"RESUMEN_CALIDAD\") {\n    msg.topic = \"SELECT limpio, COUNT(*) AS total, MAX(created_at) AS ultima_medicion FROM mediciones_brutas GROUP BY limpio ORDER BY limpio ASC;\";\n} else if (token === \"BRUTAS_RECIENTES\") {\n    msg.topic = \"SELECT id, device_id, zona, temperatura_c, mq135_aire, limpio, timestamp_origen, created_at FROM mediciones_brutas ORDER BY id DESC LIMIT 20;\";\n} else if (token === \"LIMPIAS_RECIENTES\") {\n    msg.topic = \"SELECT l.id, l.medicion_id, b.device_id, b.zona, l.temperatura_c, l.mq135_aire, l.created_at FROM mediciones_limpias l INNER JOIN mediciones_brutas b ON b.id = l.medicion_id ORDER BY l.id DESC LIMIT 20;\";\n} else if (token === \"INCIDENCIAS_RECIENTES\") {\n    msg.topic = \"SELECT id, medicion_id, device_id, zona, tipo_incidencia, detalle_incidencia, valor_detectado, created_at FROM incidencias ORDER BY id DESC LIMIT 20;\";\n} else if (token === \"ANALISIS_RECIENTES\") {\n    msg.topic = \"SELECT id, device_id, zona, periodo_dias, total_registros, fecha_inicio_analisis, fecha_fin_analisis, temp_promedio, temp_mediana, temp_moda, temp_minima, temp_maxima, temp_rango, temp_stddev, temp_varianza, mq135_promedio, mq135_mediana, mq135_moda, mq135_minima, mq135_maxima, mq135_rango, mq135_stddev, mq135_varianza, corr_temp_mq135, created_at FROM analisis_mediciones ORDER BY id DESC LIMIT 20;\";\n} else if (token === \"ACTUADORES_RECIENTES\") {\n    msg.topic = \"SELECT id, medicion_id, device_id, estado_riesgo, motivo_activacion, historial_reciente, led_estado, extractor_estado, sirena_estado, valvula_gas_estado, created_at FROM eventos_actuadores ORDER BY id DESC LIMIT 20;\";\n} else {\n    msg.topic = baseJoin + \" ORDER BY m.id DESC LIMIT 20;\";\n}\n\nmsg.queryType = \"select\";\nmsg.payload = [];\nreturn msg;",
     "outputs": 1,
     "timeout": "",
     "noerr": 0,
@@ -341,112 +428,31 @@
     "finalize": "",
     "libs": [],
     "x": 580,
-    "y": 620,
-    "wires": [["dca3b24a91085534"]]
-  },
-  {
-    "id": "3dede9491dd8b343",
-    "type": "function",
-    "z": "0ae921cb7ec6b395",
-    "name": "bloques actuadores",
-    "func": "const p = msg.payload || {};\nconst estado = p.estado || p.estado_riesgo || \"N/A\";\nconst a = p.actuadores || {};\n\nreturn [\n  { payload: `LED=${a.led || \"N/A\"} | estado=${estado}` },\n  { payload: `Extractor=${a.extractor || \"N/A\"} | estado=${estado}` },\n  { payload: `Sirena=${a.sirena || \"N/A\"} | estado=${estado}` },\n  { payload: `Valvula gas=${a.valvula_gas || \"N/A\"} | estado=${estado}` }\n];",
-    "outputs": 4,
-    "timeout": "",
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 860,
-    "y": 250,
+    "y": 680,
     "wires": [
-      ["ee160f40ad607f19"],
-      ["a10a30b41a4e1baf"],
-      ["80f26410f1f71859"],
-      ["9633e33d099a380e"]
+      [
+        "7e94b8ae46bee072"
+      ]
     ]
   },
   {
-    "id": "ee160f40ad607f19",
-    "type": "debug",
-    "z": "0ae921cb7ec6b395",
-    "name": "actuador LED",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": true,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "payload",
-    "statusType": "msg",
-    "x": 1080,
-    "y": 170,
-    "wires": []
-  },
-  {
-    "id": "a10a30b41a4e1baf",
-    "type": "debug",
-    "z": "0ae921cb7ec6b395",
-    "name": "actuador extractor",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": true,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "payload",
-    "statusType": "msg",
-    "x": 1090,
-    "y": 220,
-    "wires": []
-  },
-  {
-    "id": "80f26410f1f71859",
-    "type": "debug",
-    "z": "0ae921cb7ec6b395",
-    "name": "actuador sirena",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": true,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "payload",
-    "statusType": "msg",
-    "x": 1080,
-    "y": 270,
-    "wires": []
-  },
-  {
-    "id": "9633e33d099a380e",
-    "type": "debug",
-    "z": "0ae921cb7ec6b395",
-    "name": "actuador valvula gas",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": true,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "payload",
-    "statusType": "msg",
-    "x": 1100,
-    "y": 320,
-    "wires": []
-  },
-  {
-    "id": "dca3b24a91085534",
+    "id": "7e94b8ae46bee072",
     "type": "mysql",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "mydb": "e573d97058b2f511",
     "name": "mysql query",
     "x": 800,
-    "y": 620,
-    "wires": [["fc80bb460f478219"]]
+    "y": 680,
+    "wires": [
+      [
+        "cb9a9e0201e8b3f3"
+      ]
+    ]
   },
   {
-    "id": "fc80bb460f478219",
+    "id": "cb9a9e0201e8b3f3",
     "type": "switch",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "tipo consulta",
     "property": "queryType",
     "propertyType": "msg",
@@ -468,26 +474,40 @@
       },
       {
         "t": "eq",
+        "v": "insert_incidencia",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
         "v": "select",
         "vt": "str"
       }
     ],
     "checkall": "true",
     "repair": false,
-    "outputs": 4,
+    "outputs": 5,
     "x": 980,
-    "y": 620,
+    "y": 680,
     "wires": [
-      ["f8ea723cc2bc635b"],
-      ["240b2d8068f981ea"],
-      ["f21fe10c8747b920"],
-      ["a358d6afacf0c7a4"]
+      [
+        "caa61ebfb80f14e1"
+      ],
+      [
+        "53dc717f967b02c7"
+      ],
+      [
+        "bddd9a4a374c5ad6"
+      ],
+      [],
+      [
+        "c5783a626a5f3830"
+      ]
     ]
   },
   {
-    "id": "a358d6afacf0c7a4",
+    "id": "c5783a626a5f3830",
     "type": "function",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "formato select tabla",
     "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\n\nif (rows.length === 0) {\n    msg.payload = \"Sin resultados\";\n    return msg;\n}\n\nconst safe = (v) => String(v ?? \"\");\nconst maxRows = 20;\nconst data = rows.slice(0, maxRows);\n\nconst preferred = [\n    \"id\",\n    \"medicion_id\",\n    \"device_id\",\n    \"zona\",\n    \"temperatura_c\",\n    \"mq135_aire\",\n    \"estado_riesgo\",\n    \"detalle_estado\",\n    \"tiempo_espera_seg\",\n    \"timestamp_origen\",\n    \"created_at\"\n];\n\nconst cols = Object.keys(data[0] || {}).sort((a, b) => {\n    const ia = preferred.indexOf(a);\n    const ib = preferred.indexOf(b);\n    const va = ia === -1 ? 999 : ia;\n    const vb = ib === -1 ? 999 : ib;\n    if (va !== vb) return va - vb;\n    return a.localeCompare(b);\n});\n\nif (cols.length === 0) {\n    msg.payload = \"Sin columnas para mostrar\";\n    return msg;\n}\n\nconst widths = cols.map((c) => c.length);\nfor (const r of data) {\n    cols.forEach((c, i) => {\n        const l = safe(r[c]).length;\n        if (l > widths[i]) widths[i] = Math.min(l, 32);\n    });\n}\n\nconst trunc = (s, w) => (s.length > w ? s.slice(0, w - 1) + \"...\" : s);\nconst pad = (s, w) => trunc(s, w).padEnd(w, \" \" );\n\nconst header = cols.map((c, i) => pad(c, widths[i])).join(\" | \" );\nconst sep = widths.map((w) => \"-\".repeat(w)).join(\"-+-\");\nconst body = data.map((r) => cols.map((c, i) => pad(safe(r[c]), widths[i])).join(\" | \" )).join(\"\\n\");\n\nmsg.payload = `Filas devueltas: ${rows.length}\\n\\n${header}\\n${sep}\\n${body}`;\nreturn msg;",
     "outputs": 1,
@@ -497,13 +517,17 @@
     "finalize": "",
     "libs": [],
     "x": 1170,
-    "y": 680,
-    "wires": [["b8115394c5d54f94"]]
+    "y": 740,
+    "wires": [
+      [
+        "57840e3ded4afbc9"
+      ]
+    ]
   },
   {
-    "id": "f21fe10c8747b920",
+    "id": "bddd9a4a374c5ad6",
     "type": "debug",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "debug mysql insert",
     "active": true,
     "tosidebar": false,
@@ -514,13 +538,13 @@
     "statusVal": "payload.affectedRows",
     "statusType": "msg",
     "x": 1190,
-    "y": 620,
+    "y": 680,
     "wires": []
   },
   {
-    "id": "b8115394c5d54f94",
+    "id": "57840e3ded4afbc9",
     "type": "debug",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "debug select tabla",
     "active": true,
     "tosidebar": true,
@@ -531,13 +555,13 @@
     "statusVal": "",
     "statusType": "auto",
     "x": 1370,
-    "y": 680,
+    "y": 740,
     "wires": []
   },
   {
-    "id": "ee9345be81ff4577",
+    "id": "21f3b76329d7ad2e",
     "type": "mqtt out",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "mqtt comandos",
     "topic": "",
     "qos": "",
@@ -549,13 +573,13 @@
     "expiry": "",
     "broker": "fd407c03c80b70fc",
     "x": 860,
-    "y": 310,
+    "y": 370,
     "wires": []
   },
   {
-    "id": "a4fd53edb295f7f8",
+    "id": "708650f467981d98",
     "type": "debug",
-    "z": "0ae921cb7ec6b395",
+    "z": "fd207428a5fde675",
     "name": "debug comando broker",
     "active": true,
     "tosidebar": true,
@@ -566,7 +590,7 @@
     "statusVal": "",
     "statusType": "auto",
     "x": 850,
-    "y": 360,
+    "y": 420,
     "wires": []
   },
   {
@@ -609,5 +633,600 @@
     "db": "iot_db",
     "tz": "",
     "charset": "UTF8"
+  },
+  {
+    "id": "c0ffee0011223344",
+    "type": "tab",
+    "label": "Limpieza",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "c0ffee0011223345",
+    "type": "inject",
+    "z": "c0ffee0011223344",
+    "name": "LIMPIAR LOTE (100)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "LIMPIAR_100",
+    "payloadType": "str",
+    "x": 180,
+    "y": 100,
+    "wires": [
+      [
+        "c0ffee0011223346"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223346",
+    "type": "function",
+    "z": "c0ffee0011223344",
+    "name": "build SQL select lote",
+    "func": "msg.topic = \"SELECT id, device_id, zona, temperatura_c, mq135_aire, timestamp_origen FROM mediciones_brutas WHERE limpio = 0 ORDER BY id ASC LIMIT 100\";\nmsg.queryType = \"select_lote\";\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 450,
+    "y": 100,
+    "wires": [
+      [
+        "c0ffee0011223347"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223347",
+    "type": "mysql",
+    "z": "c0ffee0011223344",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql select lote",
+    "x": 670,
+    "y": 100,
+    "wires": [
+      [
+        "c0ffee0011223348"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223348",
+    "type": "function",
+    "z": "c0ffee0011223344",
+    "name": "build stats + split",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nif (rows.length === 0) {\n    msg.payload = \"Sin registros pendientes\";\n    return [null, msg];\n}\n\nconst TEMP_MIN = -20;\nconst TEMP_MAX = 80;\nconst MQ135_MIN = 0;\nconst MQ135_MAX = 4095;\n\nfunction isValid(v, min, max) {\n    return Number.isFinite(v) && v >= min && v <= max && v !== 0;\n}\n\nconst temps = rows.map((r) => Number(r.temperatura_c)).filter((v) => isValid(v, TEMP_MIN, TEMP_MAX));\nconst gases = rows.map((r) => Number(r.mq135_aire)).filter((v) => isValid(v, MQ135_MIN, MQ135_MAX));\n\ntemps.sort((a, b) => a - b);\ngases.sort((a, b) => a - b);\n\nfunction median(arr) {\n    if (!arr.length) return null;\n    const mid = Math.floor(arr.length / 2);\n    return arr.length % 2 === 0 ? (arr[mid - 1] + arr[mid]) / 2 : arr[mid];\n}\n\nconst stats = {\n    tempMedian: median(temps),\n    gasMedian: median(gases)\n};\n\nmsg.stats = stats;\nmsg.payload = rows;\nreturn [msg, null];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 900,
+    "y": 100,
+    "wires": [
+      [
+        "c0ffee0011223349"
+      ],
+      [
+        "c0ffee0011223355"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223349",
+    "type": "split",
+    "z": "c0ffee0011223344",
+    "name": "split rows",
+    "splt": "\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "x": 1120,
+    "y": 100,
+    "wires": [
+      [
+        "c0ffee0011223350"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223350",
+    "type": "function",
+    "z": "c0ffee0011223344",
+    "name": "validar + imputar",
+    "func": "const row = msg.payload || {};\nconst stats = msg.stats || {};\n\nconst TEMP_MIN = -20;\nconst TEMP_MAX = 80;\nconst MQ135_MIN = 0;\nconst MQ135_MAX = 4095;\n\nfunction isValid(v, min, max) {\n    return Number.isFinite(v) && v >= min && v <= max && v !== 0;\n}\n\nconst temp = Number(row.temperatura_c);\nconst gas = Number(row.mq135_aire);\n\nconst errors = [];\nif (!isValid(temp, TEMP_MIN, TEMP_MAX)) errors.push(\"temperatura_invalida\");\nif (!isValid(gas, MQ135_MIN, MQ135_MAX)) errors.push(\"mq135_invalido\");\n\nconst tempClean = isValid(temp, TEMP_MIN, TEMP_MAX) ? temp : stats.tempMedian;\nconst gasClean = isValid(gas, MQ135_MIN, MQ135_MAX) ? gas : stats.gasMedian;\n\nmsg.cleanData = {\n    temperatura_c: tempClean,\n    mq135_aire: gasClean\n};\n\nmsg.incidencia = {\n    tipo: errors.length ? \"OBSERVADO\" : \"OK\",\n    detalle: errors.length ? errors.join(\"; \") : \"sin_incidencias\",\n    valor: { temperatura_c: temp, mq135_aire: gas, errors }\n};\n\nmsg.medicionesBrutasId = Number(row.id);\nmsg.deviceId = String(row.device_id || \"ESP32\");\nmsg.zona = String(row.zona || \"N/A\");\n\nreturn [msg, msg];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1320,
+    "y": 100,
+    "wires": [
+      [
+        "c0ffee0011223351"
+      ],
+      [
+        "c0ffee0011223353"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223351",
+    "type": "function",
+    "z": "c0ffee0011223344",
+    "name": "build insert limpia",
+    "func": "const data = msg.cleanData || {};\nconst medicionId = Number(msg.medicionesBrutasId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\n\nfunction cleanNumber(value) {\n    const n = Number(value);\n    return Number.isFinite(n) && n !== 0 ? n : null;\n}\n\nconst temp = cleanNumber(data.temperatura_c);\nconst gas = cleanNumber(data.mq135_aire);\nif (temp === null || gas === null) {\n    return null;\n}\n\nmsg.topic = \"INSERT INTO mediciones_limpias (medicion_id, temperatura_c, mq135_aire) VALUES (?, ?, ?)\";\nmsg.payload = [medicionId, Number(temp.toFixed(2)), Math.round(gas)];\nmsg.queryType = \"insert_limpia\";\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1530,
+    "y": 80,
+    "wires": [
+      [
+        "c0ffee0011223352"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223352",
+    "type": "mysql",
+    "z": "c0ffee0011223344",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql insert limpia",
+    "x": 1740,
+    "y": 80,
+    "wires": [
+      [
+        "c0ffee0011223354"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223354",
+    "type": "function",
+    "z": "c0ffee0011223344",
+    "name": "update bruta limpio",
+    "func": "const medicionId = Number(msg.medicionesBrutasId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\nmsg.topic = \"UPDATE mediciones_brutas SET limpio = 1 WHERE id = ?\";\nmsg.payload = [medicionId];\nmsg.queryType = \"update_bruta\";\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1950,
+    "y": 80,
+    "wires": [
+      [
+        "c0ffee0011223356"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223356",
+    "type": "mysql",
+    "z": "c0ffee0011223344",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql update limpio",
+    "x": 2160,
+    "y": 80,
+    "wires": [
+      [
+        "c0ffee0011223357"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223357",
+    "type": "debug",
+    "z": "c0ffee0011223344",
+    "name": "debug update limpio",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 2380,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "c0ffee0011223353",
+    "type": "function",
+    "z": "c0ffee0011223344",
+    "name": "build insert incidencia",
+    "func": "const inc = msg.incidencia || {};\nconst medicionId = Number(msg.medicionesBrutasId);\nif (!Number.isFinite(medicionId) || medicionId <= 0) {\n    return null;\n}\n\nif (String(inc.tipo || \"\").toUpperCase() === \"OK\") {\n    return null;\n}\n\nconst deviceId = String(msg.deviceId || \"ESP32\");\nconst zona = String(msg.zona || \"N/A\");\nconst detalle = String(inc.detalle || \"incidencia_detectada\").slice(0, 255);\nconst valor = JSON.stringify(inc.valor || {});\n\nmsg.topic = \"INSERT INTO incidencias (medicion_id, device_id, zona, tipo_incidencia, detalle_incidencia, valor_detectado) VALUES (?, ?, ?, ?, ?, ?)\";\nmsg.payload = [\n    medicionId,\n    deviceId,\n    zona,\n    String(inc.tipo || \"ERROR\").toUpperCase(),\n    detalle,\n    valor\n];\nmsg.queryType = \"insert_incidencia\";\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1530,
+    "y": 140,
+    "wires": [
+      [
+        "c0ffee0011223358"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223358",
+    "type": "mysql",
+    "z": "c0ffee0011223344",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql insert incidencia",
+    "x": 1750,
+    "y": 140,
+    "wires": [
+      [
+        "c0ffee0011223359"
+      ]
+    ]
+  },
+  {
+    "id": "c0ffee0011223355",
+    "type": "debug",
+    "z": "c0ffee0011223344",
+    "name": "limpieza sin registros",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1110,
+    "y": 160,
+    "wires": []
+  },
+  {
+    "id": "c0ffee0011223359",
+    "type": "debug",
+    "z": "c0ffee0011223344",
+    "name": "debug insert incidencia",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1960,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "a11a22a33b44c55d",
+    "type": "tab",
+    "label": "Analisis",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "a11a22a33b44c55e",
+    "type": "inject",
+    "z": "a11a22a33b44c55d",
+    "name": "ANALISIS 30D",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "ANALISIS_30D",
+    "payloadType": "str",
+    "x": 160,
+    "y": 100,
+    "wires": [
+      [
+        "a11a22a33b44c55f"
+      ]
+    ]
+  },
+  {
+    "id": "a11a22a33b44c55f",
+    "type": "function",
+    "z": "a11a22a33b44c55d",
+    "name": "build SQL analisis 30d",
+    "func": "msg.topic = \"SELECT b.device_id, b.zona, b.timestamp_origen, l.temperatura_c, l.mq135_aire FROM mediciones_limpias l INNER JOIN mediciones_brutas b ON b.id = l.medicion_id WHERE b.timestamp_origen >= DATE_SUB(NOW(), INTERVAL 30 DAY)\";\nmsg.queryType = \"select_analisis_30d\";\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 100,
+    "wires": [
+      [
+        "a11a22a33b44c560"
+      ]
+    ]
+  },
+  {
+    "id": "a11a22a33b44c560",
+    "type": "mysql",
+    "z": "a11a22a33b44c55d",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql select analisis 30d",
+    "x": 650,
+    "y": 100,
+    "wires": [
+      [
+        "a11a22a33b44c561"
+      ]
+    ]
+  },
+  {
+    "id": "a11a22a33b44c561",
+    "type": "function",
+    "z": "a11a22a33b44c55d",
+    "name": "calcular analisis 30d",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nif (rows.length === 0) {\n    node.warn('analisis 30d sin datos');\n    return null;\n}\n\nfunction toDate(raw) {\n    const dt = new Date(raw);\n    return Number.isFinite(dt.getTime()) ? dt : null;\n}\n\nfunction round(value, digits = 2) {\n    return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;\n}\n\nfunction mean(arr) {\n    if (!arr.length) return null;\n    return arr.reduce((sum, v) => sum + v, 0) / arr.length;\n}\n\nfunction variance(arr, avg) {\n    if (!arr.length) return null;\n    const m = Number.isFinite(avg) ? avg : mean(arr);\n    if (!Number.isFinite(m)) return null;\n    return arr.reduce((sum, v) => sum + Math.pow(v - m, 2), 0) / arr.length;\n}\n\nfunction stddev(arr, avg) {\n    const v = variance(arr, avg);\n    return Number.isFinite(v) ? Math.sqrt(v) : null;\n}\n\nfunction sorted(arr) {\n    return arr.slice().sort((a, b) => a - b);\n}\n\nfunction median(arr) {\n    if (!arr.length) return null;\n    const s = sorted(arr);\n    const mid = Math.floor(s.length / 2);\n    return s.length % 2 === 0 ? (s[mid - 1] + s[mid]) / 2 : s[mid];\n}\n\nfunction mode(arr) {\n    if (!arr.length) return null;\n    const counts = {};\n    let best = null;\n    let bestCount = 0;\n    for (const v of arr) {\n        const key = Number(v).toFixed(2);\n        counts[key] = (counts[key] || 0) + 1;\n        if (counts[key] > bestCount) {\n            bestCount = counts[key];\n            best = Number(key);\n        }\n    }\n    return best;\n}\n\nfunction min(arr) { return arr.length ? Math.min(...arr) : null; }\nfunction max(arr) { return arr.length ? Math.max(...arr) : null; }\nfunction range(arr) {\n    if (!arr.length) return null;\n    return Math.max(...arr) - Math.min(...arr);\n}\n\nfunction correlation(xs, ys) {\n    if (xs.length !== ys.length || xs.length < 2) return null;\n    const mx = mean(xs);\n    const my = mean(ys);\n    let num = 0;\n    let dx = 0;\n    let dy = 0;\n    for (let i = 0; i < xs.length; i++) {\n        const a = xs[i] - mx;\n        const b = ys[i] - my;\n        num += a * b;\n        dx += a * a;\n        dy += b * b;\n    }\n    const den = Math.sqrt(dx * dy);\n    return den ? num / den : null;\n}\n\nconst grouped = {};\nfor (const r of rows) {\n    const deviceId = String(r.device_id || 'ESP32');\n    const zona = String(r.zona || 'N/A');\n    const key = deviceId + \"::\" + zona;\n    if (!grouped[key]) {\n        grouped[key] = { deviceId, zona, temps: [], gases: [], dates: [] };\n    }\n    const t = Number(r.temperatura_c);\n    const g = Number(r.mq135_aire);\n    if (Number.isFinite(t)) grouped[key].temps.push(t);\n    if (Number.isFinite(g)) grouped[key].gases.push(g);\n    const dt = toDate(r.timestamp_origen);\n    if (dt) grouped[key].dates.push(dt);\n}\n\nconst results = [];\nfor (const key of Object.keys(grouped)) {\n    const g = grouped[key];\n    const total = Math.min(g.temps.length, g.gases.length) || Math.max(g.temps.length, g.gases.length);\n    const dates = g.dates.sort((a, b) => a - b);\n    const start = dates[0];\n    const end = dates[dates.length - 1];\n    const tempAvg = mean(g.temps);\n    const gasAvg = mean(g.gases);\n    const tempVar = variance(g.temps, tempAvg);\n    const gasVar = variance(g.gases, gasAvg);\n\n    results.push({\n        device_id: g.deviceId,\n        zona: g.zona,\n        periodo_dias: 30,\n        total_registros: total,\n        fecha_inicio_analisis: start ? start.toISOString().slice(0, 19).replace('T', ' ') : null,\n        fecha_fin_analisis: end ? end.toISOString().slice(0, 19).replace('T', ' ') : null,\n        fecha_generacion: new Date().toISOString().slice(0, 19).replace('T', ' '),\n        temp_promedio: round(tempAvg),\n        temp_mediana: round(median(g.temps)),\n        temp_moda: round(mode(g.temps)),\n        temp_minima: round(min(g.temps)),\n        temp_maxima: round(max(g.temps)),\n        temp_rango: round(range(g.temps)),\n        temp_stddev: round(stddev(g.temps, tempAvg)),\n        temp_varianza: round(tempVar),\n        temp_fuera_rango: null,\n        temp_anomalias: null,\n        mq135_promedio: round(gasAvg),\n        mq135_mediana: round(median(g.gases)),\n        mq135_moda: round(mode(g.gases)),\n        mq135_minima: round(min(g.gases)),\n        mq135_maxima: round(max(g.gases)),\n        mq135_rango: round(range(g.gases)),\n        mq135_stddev: round(stddev(g.gases, gasAvg)),\n        mq135_varianza: round(gasVar),\n        mq135_fuera_rango: null,\n        mq135_anomalias: null,\n        corr_temp_mq135: round(correlation(g.temps, g.gases), 4),\n        distribucion_categorias: JSON.stringify({}),\n        patrones_temporales: JSON.stringify({}),\n        relaciones_variables: JSON.stringify({}),\n        comparacion_periodos: JSON.stringify({}),\n        justificacion_analisis: JSON.stringify({ fuente: 'mediciones_limpias' }),\n        limitaciones: JSON.stringify({})\n    });\n}\n\nmsg.payload = results;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 920,
+    "y": 100,
+    "wires": [
+      [
+        "a11a22a33b44c562"
+      ]
+    ]
+  },
+  {
+    "id": "a11a22a33b44c562",
+    "type": "split",
+    "z": "a11a22a33b44c55d",
+    "name": "split analisis",
+    "splt": "\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "x": 1140,
+    "y": 100,
+    "wires": [
+      [
+        "a11a22a33b44c563"
+      ]
+    ]
+  },
+  {
+    "id": "a11a22a33b44c563",
+    "type": "function",
+    "z": "a11a22a33b44c55d",
+    "name": "build insert analisis 30d",
+    "func": "const row = msg.payload || {};\nif (!row.device_id || !row.zona) return null;\n\nconst columns = [\n    'device_id',\n    'zona',\n    'periodo_dias',\n    'total_registros',\n    'fecha_inicio_analisis',\n    'fecha_fin_analisis',\n    'fecha_generacion',\n    'temp_promedio',\n    'temp_mediana',\n    'temp_moda',\n    'temp_minima',\n    'temp_maxima',\n    'temp_rango',\n    'temp_stddev',\n    'temp_varianza',\n    'temp_fuera_rango',\n    'temp_anomalias',\n    'mq135_promedio',\n    'mq135_mediana',\n    'mq135_moda',\n    'mq135_minima',\n    'mq135_maxima',\n    'mq135_rango',\n    'mq135_stddev',\n    'mq135_varianza',\n    'mq135_fuera_rango',\n    'mq135_anomalias',\n    'corr_temp_mq135',\n];\n\nconst values = columns.map((c) => row[c]);\n\nmsg.topic = \"INSERT INTO analisis_mediciones (\" + columns.join(\", \") + \") VALUES (\" + columns.map(() => \"?\").join(\", \") + \")\";\nmsg.payload = values;\nmsg.queryType = 'insert_analisis';\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1380,
+    "y": 100,
+    "wires": [
+      [
+        "a11a22a33b44c564"
+      ]
+    ]
+  },
+  {
+    "id": "a11a22a33b44c564",
+    "type": "mysql",
+    "z": "a11a22a33b44c55d",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql insert analisis",
+    "x": 1600,
+    "y": 100,
+    "wires": [
+      [
+        "a11a22a33b44c565"
+      ]
+    ]
+  },
+  {
+    "id": "a11a22a33b44c565",
+    "type": "debug",
+    "z": "a11a22a33b44c55d",
+    "name": "debug insert analisis",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.affectedRows",
+    "targetType": "msg",
+    "statusVal": "payload.affectedRows",
+    "statusType": "msg",
+    "x": 1820,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "3dede9491dd8b343",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "bloques actuadores",
+    "func": "const p = msg.payload || {};\nconst estado = p.estado || p.estado_riesgo || \"N/A\";\nconst a = p.actuadores || {};\nconst deviceId = String(p.device_id || \"N/A\");\n\nreturn [\n  { payload: \"LED=\" + (a.led || \"N/A\") + \" | estado=\" + estado + \" | device=\" + deviceId },\n  { payload: \"Extractor=\" + (a.extractor || \"N/A\") + \" | estado=\" + estado + \" | device=\" + deviceId },\n  { payload: \"Sirena=\" + (a.sirena || \"N/A\") + \" | estado=\" + estado + \" | device=\" + deviceId },\n  { payload: \"Valvula gas=\" + (a.valvula_gas || \"N/A\") + \" | estado=\" + estado + \" | device=\" + deviceId }\n];",
+    "outputs": 4,
+    "noerr": 0,
+    "x": 1100,
+    "y": 300,
+    "wires": [
+      [
+        "ee160f40ad607f19"
+      ],
+      [
+        "a10a30b41a4e1baf"
+      ],
+      [
+        "80f26410f1f71859"
+      ],
+      [
+        "9633e33d099a380e"
+      ]
+    ]
+  },
+  {
+    "id": "ee160f40ad607f19",
+    "type": "debug",
+    "z": "fd207428a5fde675",
+    "name": "actuador LED",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload",
+    "statusType": "auto",
+    "x": 1300,
+    "y": 260,
+    "wires": []
+  },
+  {
+    "id": "a10a30b41a4e1baf",
+    "type": "debug",
+    "z": "fd207428a5fde675",
+    "name": "actuador extractor",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload",
+    "statusType": "auto",
+    "x": 1300,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "id": "80f26410f1f71859",
+    "type": "debug",
+    "z": "fd207428a5fde675",
+    "name": "actuador sirena",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload",
+    "statusType": "auto",
+    "x": 1300,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "9633e33d099a380e",
+    "type": "debug",
+    "z": "fd207428a5fde675",
+    "name": "actuador valvula gas",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload",
+    "statusType": "auto",
+    "x": 1300,
+    "y": 380,
+    "wires": []
+  },
+  {
+    "id": "clean0011110000",
+    "type": "http in",
+    "z": "fd207428a5fde675",
+    "name": "POST /api/clean",
+    "url": "/api/clean",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 300,
+    "y": 600,
+    "wires": [
+      [
+        "clean0022220000"
+      ]
+    ]
+  },
+  {
+    "id": "clean0022220000",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "build CALL sp_limpiar_lote",
+    "func": "const batchSize = msg.payload && msg.payload.batch_size ? Number(msg.payload.batch_size) : 100;\nmsg.topic = \"CALL sp_limpiar_lote(\" + batchSize + \")\";\nmsg.payload = [batchSize];\nreturn msg;\n",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 500,
+    "y": 600,
+    "wires": [
+      [
+        "clean0033330000"
+      ]
+    ]
+  },
+  {
+    "id": "clean0033330000",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql execute",
+    "x": 700,
+    "y": 600,
+    "wires": [
+      [
+        "clean0044440000"
+      ]
+    ]
+  },
+  {
+    "id": "clean0044440000",
+    "type": "http response",
+    "z": "fd207428a5fde675",
+    "name": "200 OK",
+    "statusCode": "200",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "x": 900,
+    "y": 600,
+    "wires": []
   }
 ]

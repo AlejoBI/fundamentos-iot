@@ -8,103 +8,6 @@
     "env": []
   },
   {
-    "id": "ad546e32a05de78e",
-    "type": "inject",
-    "z": "fd207428a5fde675",
-    "name": "simulador nodo 2 (cada 7s)",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "7",
-    "crontab": "",
-    "once": true,
-    "onceDelay": "2",
-    "topic": "",
-    "payload": "",
-    "payloadType": "date",
-    "x": 270,
-    "y": 160,
-    "wires": [
-      [
-        "81bab9eb425185a3"
-      ]
-    ]
-  },
-  {
-    "id": "81bab9eb425185a3",
-    "type": "function",
-    "z": "fd207428a5fde675",
-    "name": "generar payload simulado",
-    "func": "const now = new Date();\nconst ts = now.toISOString().slice(0, 19).replace(\"T\", \" \" );\n\nconst temperatura = 24 + (Math.random() * 8);\nlet gas = 2800 + Math.floor(Math.random() * 1200);\n\nif (temperatura > 29 || Math.random() > 0.82) {\n    gas = 3600 + Math.floor(Math.random() * 500);\n}\n\nmsg.payload = {\n    device_id: \"SIM-Cocina-02\",\n    zona: \"Cocina-Simulada-02\",\n    temperatura_C: Number(temperatura.toFixed(2)),\n    mq135_aire: gas,\n    timestamp: ts\n};\n\nreturn msg;",
-    "outputs": 1,
-    "timeout": "",
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 520,
-    "y": 160,
-    "wires": [
-      [
-        "beb3879dd677f8b4",
-        "176f4aa4d01c2bde"
-      ]
-    ]
-  },
-  {
-    "id": "beb3879dd677f8b4",
-    "type": "json",
-    "z": "fd207428a5fde675",
-    "name": "json string simulador",
-    "property": "payload",
-    "action": "str",
-    "pretty": false,
-    "x": 750,
-    "y": 160,
-    "wires": [
-      [
-        "ab0138c41b137573"
-      ]
-    ]
-  },
-  {
-    "id": "ab0138c41b137573",
-    "type": "mqtt out",
-    "z": "fd207428a5fde675",
-    "name": "mqtt out simulador nodo 2",
-    "topic": "alejandro.bravo_isa@uao.edu.co/alertas",
-    "qos": "1",
-    "retain": "false",
-    "respTopic": "",
-    "contentType": "",
-    "userProps": "",
-    "correl": "",
-    "expiry": "",
-    "broker": "fd407c03c80b70fc",
-    "x": 990,
-    "y": 160,
-    "wires": []
-  },
-  {
-    "id": "176f4aa4d01c2bde",
-    "type": "debug",
-    "z": "fd207428a5fde675",
-    "name": "debug simulador nodo 2",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 770,
-    "y": 120,
-    "wires": []
-  },
-  {
     "id": "2acc93521fa78c96",
     "type": "mqtt in",
     "z": "fd207428a5fde675",
@@ -185,8 +88,8 @@
     "id": "338f8775fac15675",
     "type": "function",
     "z": "fd207428a5fde675",
-    "name": "procesar estados (ESP32)",
-    "func": "const UMBRAL_TEMP = 28.0;\nconst UMBRAL_GAS_PPM = 60;\nconst INTERVALO_NORMAL_SEG = 6;\nconst INTERVALO_ALERTA_SEG = 3;\nconst INTERVALO_EMERGENCIA_SEG = 1;\nconst TOPICO_COMANDOS = \"alejandro.bravo_isa@uao.edu.co/comandos\";\n\nconst p = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\nconst validation = msg.validation || {};\n\nfunction toNumber(v) {\n    if (v === null || v === undefined || v === \"\") return NaN;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : NaN;\n}\n\nconst temperatura = toNumber(p.temperatura_C ?? p.temperatura ?? p.temp);\nconst gasRaw = toNumber(p.mq135_aire ?? p.gas ?? p.mq135);\nconst gasPpm = toNumber(p.mq135_ppm);\n\nlet estado = \"\";\nlet detalle = \"\";\nlet motivoActuadores = \"\";\nlet intervaloSeg = INTERVALO_NORMAL_SEG;\nlet acciones = {\n    led: \"VERDE\",\n    extractor: \"APAGADO\",\n    sirena: \"APAGADA\",\n    valvula_gas: \"ABIERTA\"\n};\n\nif (!validation.hasErrors && Number.isFinite(temperatura) && Number.isFinite(gasRaw)) {\n    const temperaturaAlta = temperatura >= UMBRAL_TEMP;\n    const gasReferencia = Number.isFinite(gasPpm) ? gasPpm : gasRaw;\n    const gasAlto = gasReferencia >= UMBRAL_GAS_PPM;\n\n    if (temperaturaAlta && gasAlto) {\n        estado = \"EMERGENCIA\";\n        intervaloSeg = INTERVALO_EMERGENCIA_SEG;\n        detalle = \"Temperatura y gas altos\";\n        motivoActuadores = \"Activacion por temperatura y gas altos\";\n        acciones = {\n            led: \"ROJO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"ENCENDIDA\",\n            valvula_gas: \"CERRADA\"\n        };\n    } else if (temperaturaAlta) {\n        estado = \"ALERTA\";\n        intervaloSeg = INTERVALO_ALERTA_SEG;\n        detalle = \"Temperatura alta\";\n        motivoActuadores = \"Activacion por temperatura fuera de rango\";\n        acciones = {\n            led: \"AMARILLO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    } else if (gasAlto) {\n        estado = \"ALERTA\";\n        intervaloSeg = INTERVALO_ALERTA_SEG;\n        detalle = \"Gas alto\";\n        motivoActuadores = \"Activacion por gas fuera de rango\";\n        acciones = {\n            led: \"AMARILLO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    } else {\n        estado = \"NORMAL\";\n        intervaloSeg = INTERVALO_NORMAL_SEG;\n        detalle = \"Valores dentro de rango\";\n        motivoActuadores = \"Sistema estable\";\n        acciones = {\n            led: \"VERDE\",\n            extractor: \"APAGADO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    }\n} else {\n    estado = \"INVALIDO\";\n    detalle = validation.detalle || \"Datos incompletos\";\n    motivoActuadores = \"Datos invalidos, sin accion\";\n}\n\nconst ts = String(p.timestamp || \"\");\n\nmsg.payload = {\n    ...p,\n    estado_riesgo: estado,\n    detalle_estado: detalle,\n    tiempo_espera_seg: intervaloSeg,\n    motivo_actuadores: motivoActuadores,\n    historial_reciente: estado,\n    actuadores: acciones,\n    timestamp: ts\n};\n\nif (estado === \"INVALIDO\") {\n    return [msg, null, null];\n}\n\nconst comando = {\n    topic: TOPICO_COMANDOS,\n    payload: {\n        device_id: p.device_id || \"ALL\",\n        intervalo_seg: intervaloSeg\n    }\n};\n\nreturn [msg, msg, comando];",
+    "name": "procesar estados",
+    "func": "const UMBRAL_TEMP = 28.0;\nconst UMBRAL_GAS_PPM = 60;\nconst INTERVALO_NORMAL_SEG = 6;\nconst INTERVALO_ALERTA_SEG = 3;\nconst INTERVALO_EMERGENCIA_SEG = 1;\nconst TOPICO_COMANDOS = \"alejandro.bravo_isa@uao.edu.co/comandos\";\n\nconst p = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\nconst validation = msg.validation || {};\n\nfunction toNumber(v) {\n    if (v === null || v === undefined || v === \"\") return NaN;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : NaN;\n}\n\nconst temperatura = toNumber(p.temperatura_C ?? p.temperatura ?? p.temp);\nconst gasRaw = toNumber(p.mq135_aire ?? p.gas ?? p.mq135);\nconst gasPpm = toNumber(p.mq135_ppm);\n\nlet estado = \"\";\nlet detalle = \"\";\nlet motivoActuadores = \"\";\nlet intervaloSeg = INTERVALO_NORMAL_SEG;\nlet acciones = {\n    led: \"VERDE\",\n    extractor: \"APAGADO\",\n    sirena: \"APAGADA\",\n    valvula_gas: \"ABIERTA\"\n};\n\nif (!validation.hasErrors && Number.isFinite(temperatura) && Number.isFinite(gasRaw)) {\n    const temperaturaAlta = temperatura >= UMBRAL_TEMP;\n    const gasReferencia = Number.isFinite(gasPpm) ? gasPpm : gasRaw;\n    const gasAlto = gasReferencia >= UMBRAL_GAS_PPM;\n\n    if (temperaturaAlta) {\n        if (gasAlto) {\n            estado = \"EMERGENCIA\";\n            intervaloSeg = INTERVALO_EMERGENCIA_SEG;\n            detalle = \"Temperatura y gas altos\";\n            motivoActuadores = \"Activacion por temperatura y gas altos\";\n            acciones = {\n                led: \"ROJO\",\n                extractor: \"ENCENDIDO\",\n                sirena: \"ENCENDIDA\",\n                valvula_gas: \"CERRADA\"\n            };\n        } else {\n            estado = \"ALERTA\";\n            intervaloSeg = INTERVALO_ALERTA_SEG;\n            detalle = \"Temperatura alta\";\n            motivoActuadores = \"Activacion por temperatura fuera de rango\";\n            acciones = {\n                led: \"AMARILLO\",\n                extractor: \"ENCENDIDO\",\n                sirena: \"APAGADA\",\n                valvula_gas: \"ABIERTA\"\n            };\n        }\n    } else if (gasAlto) {\n        estado = \"ALERTA\";\n        intervaloSeg = INTERVALO_ALERTA_SEG;\n        detalle = \"Gas alto\";\n        motivoActuadores = \"Activacion por gas fuera de rango\";\n        acciones = {\n            led: \"AMARILLO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    } else {\n        estado = \"NORMAL\";\n        intervaloSeg = INTERVALO_NORMAL_SEG;\n        detalle = \"Valores dentro de rango\";\n        motivoActuadores = \"Sistema estable\";\n        acciones = {\n            led: \"VERDE\",\n            extractor: \"APAGADO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    }\n} else {\n    estado = \"INVALIDO\";\n    detalle = validation.detalle || \"Datos incompletos\";\n    motivoActuadores = \"Datos invalidos, sin accion\";\n}\n\nconst ts = String(p.timestamp || \"\");\n\nmsg.payload = {\n    ...p,\n    estado_riesgo: estado,\n    detalle_estado: detalle,\n    tiempo_espera_seg: intervaloSeg,\n    motivo_actuadores: motivoActuadores,\n    historial_reciente: estado,\n    actuadores: acciones,\n    timestamp: ts\n};\n\nif (estado === \"INVALIDO\") {\n    return [msg, null, null];\n}\n\nconst comando = {\n    topic: TOPICO_COMANDOS,\n    payload: {\n        device_id: p.device_id || \"ALL\",\n        intervalo_seg: intervaloSeg\n    }\n};\n\nreturn [msg, msg, comando];",
     "outputs": 3,
     "timeout": "",
     "noerr": 0,
@@ -213,7 +116,7 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "build SQL insert bruta",
-    "func": "const p = msg.payload || {};\n\nfunction toNumberOrDefault(v, def = 0) {\n    const n = Number(v);\n    return Number.isFinite(n) ? n : def;\n}\n\nconst temp = toNumberOrDefault(p.temperatura_C, 0);\nconst gas = toNumberOrDefault(p.mq135_aire, 0);\n\nconst deviceId = String(p.device_id || \"ESP32\");\nconst zona = String(p.zona || \"N/A\");\nconst estado = String(p.estado_riesgo || \"INVALIDO\").toUpperCase();\nconst detalle = String(p.detalle_estado || \"\");\nconst motivoActuadores = String(p.motivo_actuadores || \"Sin motivo\");\nconst historialReciente = String(p.historial_reciente || estado);\nconst espera = Number(p.tiempo_espera_seg);\nconst tiempoEspera = Number.isFinite(espera) ? Number(espera.toFixed(2)) : null;\nlet ts = String(p.timestamp || \"\");\n\nif (!ts) {\n    const now = new Date();\n    ts = now.toISOString().slice(0, 19).replace(\"T\", \" \");\n}\n\nmsg.deviceId = deviceId;\nmsg.zona = zona;\nmsg.estadoRiesgo = estado;\nmsg.detalleEstado = detalle;\nmsg.tiempoEspera = tiempoEspera;\nmsg.motivoActuadores = motivoActuadores;\nmsg.historialReciente = historialReciente;\nmsg.actuadores = p.actuadores || {};\n\nmsg.topic = \"INSERT INTO mediciones_brutas (device_id, zona, temperatura_c, mq135_aire, timestamp_origen) VALUES (?, ?, ?, ?, ?)\";\nmsg.payload = [\n    deviceId,\n    zona,\n    Number(temp.toFixed(2)),\n    Math.round(gas),\n    ts\n];\nmsg.queryType = \"insert_bruta\";\n\nreturn msg;",
+    "func": "const p = msg.payload || {};\n\nfunction toNumberOrDefault(v, def = 0) {\n    const n = Number(v);\n    return Number.isFinite(n) ? n : def;\n}\n\nconst temp = toNumberOrDefault(p.temperatura_C, 0);\nconst gas = toNumberOrDefault(p.mq135_aire, 0);\n\nconst deviceId = String(p.device_id || \"ESP32\");\nconst zona = String(p.zona || \"N/A\");\nconst estado = String(p.estado_riesgo || \"INVALIDO\").toUpperCase();\nconst detalle = String(p.detalle_estado || \"\");\nconst motivoActuadores = String(p.motivo_actuadores || \"Sin motivo\");\nconst historialReciente = String(p.historial_reciente || estado);\nconst espera = Number(p.tiempo_espera_seg);\nconst tiempoEspera = Number.isFinite(espera) ? Number(espera.toFixed(2)) : null;\nlet ts = String(p.timestamp || \"\");\n\nif (ts) {\n    ts = ts.replace(\"T\", \" \").replace(/[.]\\d+Z$/, \"\").replace(/Z$/, \"\");\n} else {\n    const now = new Date();\n    ts = now.toISOString().slice(0, 19).replace(\"T\", \" \");\n}\n\nmsg.deviceId = deviceId;\nmsg.zona = zona;\nmsg.estadoRiesgo = estado;\nmsg.detalleEstado = detalle;\nmsg.tiempoEspera = tiempoEspera;\nmsg.motivoActuadores = motivoActuadores;\nmsg.historialReciente = historialReciente;\nmsg.actuadores = p.actuadores || {};\n\nmsg.topic = \"INSERT INTO mediciones_brutas (device_id, zona, temperatura_c, mq135_aire, timestamp_origen) VALUES (?, ?, ?, ?, ?)\";\nmsg.payload = [\n    deviceId,\n    zona,\n    Number(temp.toFixed(2)),\n    Math.round(gas),\n    ts\n];\nmsg.queryType = \"insert_bruta\";\n\nreturn msg;",
     "outputs": 1,
     "timeout": "",
     "noerr": 0,
@@ -596,7 +499,7 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "bloques actuadores (ESP32-Cocina-01)",
-    "func": "const p = msg.payload || {};\nconst estado = p.estado || p.estado_riesgo || \"N/A\";\nconst a = p.actuadores || {};\nconst deviceId = String(p.device_id || \"N/A\");\n\nreturn [\n  { payload: `LED=${a.led || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Extractor=${a.extractor || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Sirena=${a.sirena || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Valvula gas=${a.valvula_gas || \"N/A\"} | estado=${estado} | device=${deviceId}` }\n];",
+    "func": "const TARGET_DEVICE = \"ESP32-Cocina-01\";\nconst p = msg.payload || {};\nconst deviceId = String(p.device_id || \"\");\n\nif (deviceId !== TARGET_DEVICE) {\n    return null;\n}\n\nconst estado = p.estado || p.estado_riesgo || \"N/A\";\nconst a = p.actuadores || {};\n\nreturn [\n  { payload: `LED=${a.led || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Extractor=${a.extractor || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Sirena=${a.sirena || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Valvula gas=${a.valvula_gas || \"N/A\"} | estado=${estado} | device=${deviceId}` }\n];",
     "outputs": 4,
     "timeout": "",
     "noerr": 0,
@@ -625,7 +528,7 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "bloques actuadores (SIM-Cocina-02)",
-    "func": "const p = msg.payload || {};\nconst estado = p.estado || p.estado_riesgo || \"N/A\";\nconst a = p.actuadores || {};\nconst deviceId = String(p.device_id || \"N/A\");\n\nreturn [\n  { payload: `LED=${a.led || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Extractor=${a.extractor || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Sirena=${a.sirena || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Valvula gas=${a.valvula_gas || \"N/A\"} | estado=${estado} | device=${deviceId}` }\n];",
+    "func": "const TARGET_DEVICE = \"SIM-Cocina-02\";\nconst p = msg.payload || {};\nconst deviceId = String(p.device_id || \"\");\n\nif (deviceId !== TARGET_DEVICE) {\n    return null;\n}\n\nconst estado = p.estado || p.estado_riesgo || \"N/A\";\nconst a = p.actuadores || {};\n\nreturn [\n  { payload: `LED=${a.led || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Extractor=${a.extractor || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Sirena=${a.sirena || \"N/A\"} | estado=${estado} | device=${deviceId}` },\n  { payload: `Valvula gas=${a.valvula_gas || \"N/A\"} | estado=${estado} | device=${deviceId}` }\n];",
     "outputs": 4,
     "timeout": "",
     "noerr": 0,
