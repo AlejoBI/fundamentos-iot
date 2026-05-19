@@ -10,3 +10,4 @@ include/config.h
 
 # Dependencias
 api/node_modules/
+.*/node_modules/
