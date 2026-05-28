@@ -1,5 +1,5 @@
 const API_BASE = `${window.location.origin}/api`;
-const NR_BASE = `${window.location.protocol}//${window.location.hostname}:1880`;
+const WS_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:1880/ws/latest`;
 const MAX_POINTS = 50;
 const ONLINE_WINDOW_MS = 60 * 1000;
 const APP_TIME_ZONE = "America/Bogota";
@@ -854,7 +854,7 @@ async function triggerClean() {
   setCleanStatus("Lanzando limpieza...");
   if (cleanBtn) cleanBtn.disabled = true;
   try {
-    const data = await fetchJson(`${NR_BASE}/api/clean`, { method: "POST" });
+    const data = await fetchJson(`${API_BASE}/clean`, { method: "POST" });
     const stamp = formatTimestamp(new Date().toISOString());
     setCleanStatus(`${data.message || "Solicitada"} · ${stamp}`);
     loadAnalysis();
@@ -886,39 +886,49 @@ function showPage(target) {
   if (!isDashboard) loadAnalysis();
 }
 
-function initSse() {
-  const sse = new EventSource(`${API_BASE}/stream/latest`);
+function initWebSocket() {
+  let ws = null;
   let lastAnalysisTs = 0;
   let lastIncidentsTs = 0;
-  sse.addEventListener("latest", (event) => {
-    setConnection(true, "Conectado");
-    try {
-      const data = JSON.parse(event.data);
-      if (data && Array.isArray(data.items) && data.items.length > 0) {
-        latestNodes = data.items;
-      }
-      applyFilters();
-      if (selectedId) {
-        const latest = latestNodes.find((node) => node.device_id === selectedId);
-        if (latest) {
-          updateDetail(latest);
-          try { appendLatest(latest); } catch (e) { console.error("appendLatest:", e); }
-          try { updateGauges(latest); } catch (e) { console.error("updateGauges:", e); }
-          try { updateActuators(latest); } catch (e) { console.error("updateActuators:", e); }
+  let reconnectTimer = null;
+
+  function connect() {
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => setConnection(true, "Conectado (WS)");
+    ws.onclose = () => {
+      setConnection(false, "Reconectando WS...");
+      if (!reconnectTimer) reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, 3000);
+    };
+    ws.onerror = () => ws.close();
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data && Array.isArray(data.items) && data.items.length > 0) {
+          latestNodes = data.items;
         }
+        applyFilters();
+        if (selectedId) {
+          const latest = latestNodes.find((node) => node.device_id === selectedId);
+          if (latest) {
+            updateDetail(latest);
+            try { appendLatest(latest); } catch (e) { console.error("appendLatest:", e); }
+            try { updateGauges(latest); } catch (e) { console.error("updateGauges:", e); }
+            try { updateActuators(latest); } catch (e) { console.error("updateActuators:", e); }
+          }
+        }
+      } catch (_) { /* ignore parse errors */ }
+      const now = Date.now();
+      if (now - lastAnalysisTs >= ANALYSIS_REFRESH_MS) {
+        lastAnalysisTs = now;
+        loadAnalysis();
       }
-    } catch (_) { /* ignore parse errors */ }
-    const now = Date.now();
-    if (now - lastAnalysisTs >= ANALYSIS_REFRESH_MS) {
-      lastAnalysisTs = now;
-      loadAnalysis();
-    }
-    if (selectedId && now - lastIncidentsTs >= ANALYSIS_REFRESH_MS) {
-      lastIncidentsTs = now;
-      loadIncidencias(selectedId);
-    }
-  });
-  sse.addEventListener("error", () => setConnection(false, "Reconectando..."));
+      if (selectedId && now - lastIncidentsTs >= ANALYSIS_REFRESH_MS) {
+        lastIncidentsTs = now;
+        loadIncidencias(selectedId);
+      }
+    };
+  }
+  connect();
 }
 
 refreshBtn.addEventListener("click", loadNodesOnce);
@@ -952,5 +962,5 @@ try { buildCharts(); } catch (e) { console.error("buildCharts:", e); }
 try { buildGauges(); } catch (e) { console.error("buildGauges:", e); }
 try { buildAnalysisCharts(); } catch (e) { console.error("buildAnalysisCharts:", e); }
 loadNodesOnce();
-initSse();
+initWebSocket();
 showPage("dashboard");

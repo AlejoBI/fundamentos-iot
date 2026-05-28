@@ -2309,5 +2309,102 @@
     "x": 1390,
     "y": 1860,
     "wires": []
+  },
+  {
+    "id": "ws1001",
+    "type": "inject",
+    "z": "fd207428a5fde675",
+    "name": "every 2s",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "2",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 2,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 200,
+    "y": 2000,
+    "wires": [
+      [
+        "ws1002"
+      ]
+    ]
+  },
+  {
+    "id": "ws1002",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "SQL: all latest",
+    "func": "msg.topic = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, m.timestamp_origen, m.created_at, m.limpio, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.led_estado, evt.extractor_estado, evt.sirena_estado, evt.valvula_gas_estado, evt.created_at AS motivo_created_at FROM mediciones_brutas m INNER JOIN (SELECT device_id, MAX(id) AS max_id FROM mediciones_brutas GROUP BY device_id) t ON m.device_id = t.device_id AND m.id = t.max_id LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores GROUP BY device_id) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id ORDER BY m.device_id\";\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 420,
+    "y": 2000,
+    "wires": [
+      [
+        "ws1003"
+      ]
+    ]
+  },
+  {
+    "id": "ws1003",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql query",
+    "x": 640,
+    "y": 2000,
+    "wires": [
+      [
+        "ws1004"
+      ]
+    ]
+  },
+  {
+    "id": "ws1004",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "format ws output",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = {\n  items: rows.map(r => ({\n    ...r,\n    actuadores: {\n      led: r.led_estado || \"N/A\",\n      extractor: r.extractor_estado || \"N/A\",\n      sirena: r.sirena_estado || \"N/A\",\n      valvula_gas: r.valvula_gas_estado || \"N/A\"\n    }\n  }))\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 850,
+    "y": 2000,
+    "wires": [
+      [
+        "ws1005"
+      ]
+    ]
+  },
+  {
+    "id": "ws1005",
+    "type": "websocket out",
+    "z": "fd207428a5fde675",
+    "name": "WS out latest",
+    "server": "ws-listener-01",
+    "client": "",
+    "path": "",
+    "wholemsg": "false",
+    "x": 1090,
+    "y": 2000,
+    "wires": []
+  },
+  {
+    "id": "ws-listener-01",
+    "type": "websocket-listener",
+    "path": "/ws/latest",
+    "wholemsg": "false",
+    "subprotocol": "",
+    "tls": "",
+    "hb": 0
   }
 ]
