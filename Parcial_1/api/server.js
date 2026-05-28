@@ -2,6 +2,7 @@ const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const mysql = require("mysql2/promise");
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
@@ -10,7 +11,20 @@ app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
 const NR_URL = process.env.NR_URL || "http://nodered:1880";
-const SSE_INTERVAL_MS = Number(process.env.SSE_INTERVAL_MS || 5000);
+const SSE_INTERVAL_MS = Number(process.env.SSE_INTERVAL_MS || 2000);
+
+// Direct MySQL pool (bypass Node-RED for SSE reads)
+const dbPool = mysql.createPool({
+  host: process.env.MYSQL_HOST || "mysql",
+  port: Number(process.env.MYSQL_PORT || 3306),
+  database: process.env.MYSQL_DATABASE || "iot_db",
+  user: process.env.MYSQL_USER || "iot_user",
+  password: process.env.MYSQL_PASSWORD || "iot_pass",
+  waitForConnections: true,
+  connectionLimit: 5,
+  queueLimit: 0,
+  enableKeepAlive: true
+});
 
 function proxyRoute() {
   return async (req, res) => {
@@ -51,29 +65,78 @@ for (const [method, route] of routes) {
   app[method](route, proxyRoute());
 }
 
-// SSE streaming — polls Node-RED periodically
+// Direct MySQL query for nodes (bypasses Node-RED for speed)
+const NODES_SQL = `
+  SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire,
+         m.timestamp_origen, m.created_at, m.limpio,
+         e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg,
+         evt.motivo_activacion, evt.led_estado, evt.extractor_estado,
+         evt.sirena_estado, evt.valvula_gas_estado
+  FROM mediciones_brutas m
+  INNER JOIN (
+    SELECT device_id, MAX(id) AS max_id
+    FROM mediciones_brutas GROUP BY device_id
+  ) t ON m.device_id = t.device_id AND m.id = t.max_id
+  LEFT JOIN estados_medicion e ON e.medicion_id = m.id
+  LEFT JOIN (
+    SELECT device_id, MAX(id) AS max_evt_id
+    FROM eventos_actuadores GROUP BY device_id
+  ) te ON te.device_id = m.device_id
+  LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id
+  ORDER BY m.device_id
+`;
+
+async function fetchNodesDirect() {
+  const [rows] = await dbPool.query(NODES_SQL);
+  const items = rows.map(r => ({
+    ...r,
+    actuadores: {
+      led: r.led_estado || "N/A",
+      extractor: r.extractor_estado || "N/A",
+      sirena: r.sirena_estado || "N/A",
+      valvula_gas: r.valvula_gas_estado || "N/A"
+    }
+  }));
+  return { items, ts: new Date().toISOString() };
+}
+
+// SSE streaming — polls MySQL directly (fast path, bypasses Node-RED)
 app.get("/api/stream/latest", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
-  const sendLatest = async () => {
+  let lastValidPayload = JSON.stringify({ items: [], ts: new Date().toISOString() });
+
+  const tryFetch = async () => {
     try {
-      const nrResp = await fetch(`${NR_URL}${req.originalUrl}`);
-      if (!nrResp.ok) throw new Error("nr_error");
-      const data = await nrResp.json();
-      const payload = JSON.stringify({ items: data.items || [], ts: new Date().toISOString() });
-      res.write("event: latest\n");
-      res.write(`data: ${payload}\n\n`);
-    } catch (_err) {
-      res.write("event: error\n");
-      res.write(`data: ${JSON.stringify({ error: "stream_error" })}\n\n`);
+      return await fetchNodesDirect();
+    } catch (err) {
+      console.error(`[sse] db poll: ${err.message}`);
+      throw err;
     }
   };
 
-  await sendLatest();
-  const timer = setInterval(sendLatest, SSE_INTERVAL_MS);
+  try {
+    const result = await tryFetch();
+    if (result.items.length > 0) lastValidPayload = JSON.stringify(result);
+  } catch (err) {
+    console.error(`[sse] initial db poll: ${err.message}`);
+  }
+  res.write("event: latest\n");
+  res.write(`data: ${lastValidPayload}\n\n`);
+
+  const timer = setInterval(async () => {
+    try {
+      const result = await tryFetch();
+      if (result.items.length > 0) lastValidPayload = JSON.stringify(result);
+    } catch (err) {
+      console.error(`[sse] db poll: ${err.message}`);
+    }
+    res.write("event: latest\n");
+    res.write(`data: ${lastValidPayload}\n\n`);
+  }, SSE_INTERVAL_MS);
 
   req.on("close", () => { clearInterval(timer); res.end(); });
 });

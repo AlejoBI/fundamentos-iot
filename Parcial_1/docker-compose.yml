@@ -31,6 +31,11 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      UMBRAL_TEMP: ${UMBRAL_TEMP}
+      UMBRAL_GAS: ${UMBRAL_GAS}
+      INTERVALO_NORMAL_SEG: ${INTERVALO_NORMAL_SEG}
+      INTERVALO_ALERTA_SEG: ${INTERVALO_ALERTA_SEG}
+      INTERVALO_EMERGENCIA_SEG: ${INTERVALO_EMERGENCIA_SEG}
     ports:
       - "1880:1880"
     volumes:
@@ -52,43 +57,46 @@ services:
     restart: unless-stopped
     depends_on:
       - nodered
+      - mysql
     working_dir: /app
     environment:
       TZ: America/Bogota
       PORT: 3001
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - ./api:/app
     ports:
       - "3001:3001"
     command: sh -lc "npm install && npm run start"
 
-  simulator-cocina-01:
+  simulator:
     build: ./simulator
-    container_name: iot-sim-cocina-01
+    container_name: iot-sim-cocina
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      SIM_DEVICE_ID: SIM-Cocina-01
-      SIM_ZONA: Cocina-Principal
-      SIM_TEMP_MIN: "21"
-      SIM_TEMP_MAX: "36"
-      SIM_MQ135_MIN: "100"
-      SIM_MQ135_MAX: "3500"
-
-  simulator-cocina-02:
-    build: ./simulator
-    container_name: iot-sim-cocina-02
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      SIM_DEVICE_ID: SIM-Cocina-02
-      SIM_ZONA: Cocina-Simulada-02
-      SIM_TEMP_MIN: "20"
-      SIM_TEMP_MAX: "32"
-      SIM_MQ135_MIN: "150"
-      SIM_MQ135_MAX: "3000"
+      TZ: America/Bogota
+      SIM_DEVICE_ID: ${DEVICE_ID_SIM}
+      SIM_ZONA: ${ZONA_SIM}
+      SIM_TEMP_MIN: ${SIM_TEMP_MIN}
+      SIM_TEMP_MAX: ${SIM_TEMP_MAX}
+      SIM_MQ135_MIN: ${SIM_MQ135_MIN}
+      SIM_MQ135_MAX: ${SIM_MQ135_MAX}
+      SIM_MISSING_PROB: ${SIM_MISSING_PROB}
+      SIM_OUTLIER_PROB: ${SIM_OUTLIER_PROB}
+      SIM_DUP_PROB: ${SIM_DUP_PROB}
+      SIM_GAP_PROB: ${SIM_GAP_PROB}
+      SIM_GAP_SECONDS: ${SIM_GAP_SECONDS}
+      UMBRAL_TEMP: ${UMBRAL_TEMP}
+      UMBRAL_GAS: ${UMBRAL_GAS}
+      INTERVALO_NORMAL_SEG: ${INTERVALO_NORMAL_SEG}
+      INTERVALO_ALERTA_SEG: ${INTERVALO_ALERTA_SEG}
+      INTERVALO_EMERGENCIA_SEG: ${INTERVALO_EMERGENCIA_SEG}
 
 volumes:
   mysql_data:

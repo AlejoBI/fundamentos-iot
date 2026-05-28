@@ -1,6 +1,11 @@
 CREATE DATABASE IF NOT EXISTS iot_db;
 USE iot_db;
 
+-- Allow API container (any Docker host) to connect
+CREATE USER IF NOT EXISTS 'iot_user'@'%' IDENTIFIED BY 'iot_pass';
+GRANT ALL PRIVILEGES ON iot_db.* TO 'iot_user'@'%';
+FLUSH PRIVILEGES;
+
 DROP TABLE IF EXISTS alertas_eventos;
 DROP TABLE IF EXISTS mediciones;
 DROP TABLE IF EXISTS eventos_actuadores;

@@ -5,7 +5,33 @@
     "label": "Flujo 1",
     "disabled": false,
     "info": "",
-    "env": []
+    "env": [
+      {
+        "name": "UMBRAL_TEMP",
+        "value": "",
+        "type": "env"
+      },
+      {
+        "name": "UMBRAL_GAS",
+        "value": "",
+        "type": "env"
+      },
+      {
+        "name": "INTERVALO_NORMAL_SEG",
+        "value": "",
+        "type": "env"
+      },
+      {
+        "name": "INTERVALO_ALERTA_SEG",
+        "value": "",
+        "type": "env"
+      },
+      {
+        "name": "INTERVALO_EMERGENCIA_SEG",
+        "value": "",
+        "type": "env"
+      }
+    ]
   },
   {
     "id": "2acc93521fa78c96",
@@ -20,8 +46,8 @@
     "rap": true,
     "rh": 0,
     "inputs": 0,
-    "x": 160,
-    "y": 330,
+    "x": 110,
+    "y": 320,
     "wires": [
       [
         "dcaf411322198648"
@@ -36,8 +62,8 @@
     "property": "payload",
     "action": "obj",
     "pretty": false,
-    "x": 350,
-    "y": 330,
+    "x": 290,
+    "y": 320,
     "wires": [
       [
         "a1f5e6c7d8b9a0b1"
@@ -56,8 +82,8 @@
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "x": 560,
-    "y": 330,
+    "x": 540,
+    "y": 320,
     "wires": [
       [
         "338f8775fac15675"
@@ -69,7 +95,7 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "procesar estados",
-    "func": "const UMBRAL_TEMP = 28.0;\nconst UMBRAL_GAS = 3600;\nconst INTERVALO_NORMAL_SEG = 6;\nconst INTERVALO_ALERTA_SEG = 3;\nconst INTERVALO_EMERGENCIA_SEG = 1;\nconst TOPICO_COMANDOS = \"alejandro.bravo_isa@uao.edu.co/comandos\";\n\nconst p = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\nconst validation = msg.validation || {};\n\nfunction toNumber(v) {\n    if (v === null || v === undefined || v === \"\") return NaN;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : NaN;\n}\n\nconst temperatura = toNumber(p.temperatura_C ?? p.temperatura ?? p.temp);\nconst gasRaw = toNumber(p.mq135_aire ?? p.gas ?? p.mq135);\nconst gasPpm = toNumber(p.mq135_ppm);\n\nlet estado = \"\";\nlet detalle = \"\";\nlet motivoActuadores = \"\";\nlet intervaloSeg = INTERVALO_NORMAL_SEG;\nlet acciones = {\n    led: \"VERDE\",\n    extractor: \"APAGADO\",\n    sirena: \"APAGADA\",\n    valvula_gas: \"ABIERTA\"\n};\n\nif (!validation.hasErrors && Number.isFinite(temperatura) && Number.isFinite(gasRaw)) {\n    const temperaturaAlta = temperatura >= UMBRAL_TEMP;\n    const gasReferencia = gasRaw;\n    const gasAlto = gasReferencia >= UMBRAL_GAS;\n\n    if (temperaturaAlta) {\n        if (gasAlto) {\n            estado = \"EMERGENCIA\";\n            intervaloSeg = INTERVALO_EMERGENCIA_SEG;\n            detalle = \"Temperatura y gas altos\";\n            motivoActuadores = \"Activacion por temperatura y gas altos\";\n            acciones = {\n                led: \"ROJO\",\n                extractor: \"ENCENDIDO\",\n                sirena: \"ENCENDIDA\",\n                valvula_gas: \"CERRADA\"\n            };\n        } else {\n            estado = \"ALERTA\";\n            intervaloSeg = INTERVALO_ALERTA_SEG;\n            detalle = \"Temperatura alta\";\n            motivoActuadores = \"Activacion por temperatura fuera de rango\";\n            acciones = {\n                led: \"AMARILLO\",\n                extractor: \"ENCENDIDO\",\n                sirena: \"APAGADA\",\n                valvula_gas: \"ABIERTA\"\n            };\n        }\n    } else if (gasAlto) {\n        estado = \"ALERTA\";\n        intervaloSeg = INTERVALO_ALERTA_SEG;\n        detalle = \"Gas alto\";\n        motivoActuadores = \"Activacion por gas fuera de rango\";\n        acciones = {\n            led: \"AMARILLO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    } else {\n        estado = \"NORMAL\";\n        intervaloSeg = INTERVALO_NORMAL_SEG;\n        detalle = \"Valores dentro de rango\";\n        motivoActuadores = \"Sistema estable\";\n        acciones = {\n            led: \"VERDE\",\n            extractor: \"APAGADO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    }\n} else {\n    estado = \"INVALIDO\";\n    detalle = validation.detalle || \"Datos incompletos\";\n    motivoActuadores = \"Datos invalidos, sin accion\";\n}\n\nconst ts = String(p.timestamp || \"\");\n\nmsg.payload = {\n    ...p,\n    estado_riesgo: estado,\n    detalle_estado: detalle,\n    tiempo_espera_seg: intervaloSeg,\n    motivo_actuadores: motivoActuadores,\n    historial_reciente: estado,\n    actuadores: acciones,\n    timestamp: ts\n};\n\nif (estado === \"INVALIDO\") {\n    return [msg, null, null];\n}\n\nconst comando = {\n    topic: TOPICO_COMANDOS,\n    payload: JSON.stringify({\n        device_id: p.device_id || \"ALL\",\n        estado: estado,\n        intervalo_seg: intervaloSeg,\n        actuadores: acciones\n    })\n};\n\nreturn [msg, msg, comando];",
+    "func": "const UMBRAL_TEMP = Number(env.get(\"UMBRAL_TEMP\")) || 28.0;\nconst UMBRAL_GAS = Number(env.get(\"UMBRAL_GAS\")) || 3600;\nconst INTERVALO_NORMAL_SEG = Number(env.get(\"INTERVALO_NORMAL_SEG\")) || 10;\nconst INTERVALO_ALERTA_SEG = Number(env.get(\"INTERVALO_ALERTA_SEG\")) || 6;\nconst INTERVALO_EMERGENCIA_SEG = Number(env.get(\"INTERVALO_EMERGENCIA_SEG\")) || 3;\nconst TOPICO_COMANDOS = \"alejandro.bravo_isa@uao.edu.co/comandos\";\n\nconst p = (typeof msg.payload === \"object\" && msg.payload !== null) ? msg.payload : {};\nconst validation = msg.validation || {};\n\nfunction toNumber(v) {\n    if (v === null || v === undefined || v === \"\") return NaN;\n    const n = Number(v);\n    return Number.isFinite(n) ? n : NaN;\n}\n\nconst temperatura = toNumber(p.temperatura_C ?? p.temperatura ?? p.temp);\nconst gasRaw = toNumber(p.mq135_aire ?? p.gas ?? p.mq135);\nconst gasPpm = toNumber(p.mq135_ppm);\n\nlet estado = \"\";\nlet detalle = \"\";\nlet motivoActuadores = \"\";\nlet intervaloSeg = INTERVALO_NORMAL_SEG;\nlet acciones = {\n    led: \"VERDE\",\n    extractor: \"APAGADO\",\n    sirena: \"APAGADA\",\n    valvula_gas: \"ABIERTA\"\n};\n\nif (!validation.hasErrors && Number.isFinite(temperatura) && Number.isFinite(gasRaw)) {\n    const temperaturaAlta = temperatura >= UMBRAL_TEMP;\n    const gasReferencia = gasRaw;\n    const gasAlto = gasReferencia >= UMBRAL_GAS;\n\n    if (temperaturaAlta) {\n        if (gasAlto) {\n            estado = \"EMERGENCIA\";\n            intervaloSeg = INTERVALO_EMERGENCIA_SEG;\n            detalle = \"Temperatura y gas altos\";\n            motivoActuadores = \"Activacion por temperatura y gas altos\";\n            acciones = {\n                led: \"ROJO\",\n                extractor: \"ENCENDIDO\",\n                sirena: \"ENCENDIDA\",\n                valvula_gas: \"CERRADA\"\n            };\n        } else {\n            estado = \"ALERTA\";\n            intervaloSeg = INTERVALO_ALERTA_SEG;\n            detalle = \"Temperatura alta\";\n            motivoActuadores = \"Activacion por temperatura fuera de rango\";\n            acciones = {\n                led: \"AMARILLO\",\n                extractor: \"ENCENDIDO\",\n                sirena: \"APAGADA\",\n                valvula_gas: \"ABIERTA\"\n            };\n        }\n    } else if (gasAlto) {\n        estado = \"ALERTA\";\n        intervaloSeg = INTERVALO_ALERTA_SEG;\n        detalle = \"Gas alto\";\n        motivoActuadores = \"Activacion por gas fuera de rango\";\n        acciones = {\n            led: \"AMARILLO\",\n            extractor: \"ENCENDIDO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    } else {\n        estado = \"NORMAL\";\n        intervaloSeg = INTERVALO_NORMAL_SEG;\n        detalle = \"Valores dentro de rango\";\n        motivoActuadores = \"Sistema estable\";\n        acciones = {\n            led: \"VERDE\",\n            extractor: \"APAGADO\",\n            sirena: \"APAGADA\",\n            valvula_gas: \"ABIERTA\"\n        };\n    }\n} else {\n    estado = \"INVALIDO\";\n    detalle = validation.detalle || \"Datos incompletos\";\n    motivoActuadores = \"Datos invalidos, sin accion\";\n}\n\nconst ts = String(p.timestamp || \"\");\n\nmsg.payload = {\n    ...p,\n    estado_riesgo: estado,\n    detalle_estado: detalle,\n    tiempo_espera_seg: intervaloSeg,\n    motivo_actuadores: motivoActuadores,\n    historial_reciente: estado,\n    actuadores: acciones,\n    timestamp: ts\n};\n\nif (estado === \"INVALIDO\") {\n    return [msg, null, null];\n}\n\nconst comando = {\n    topic: TOPICO_COMANDOS,\n    payload: JSON.stringify({\n        device_id: p.device_id || \"ALL\",\n        estado: estado,\n        intervalo_seg: intervaloSeg,\n        actuadores: acciones\n    })\n};\n\nreturn [msg, msg, comando];",
     "outputs": 3,
     "timeout": "",
     "noerr": 0,
@@ -572,8 +598,8 @@
     "correl": "",
     "expiry": "",
     "broker": "fd407c03c80b70fc",
-    "x": 860,
-    "y": 370,
+    "x": 1010,
+    "y": 360,
     "wires": []
   },
   {
@@ -589,7 +615,7 @@
     "targetType": "msg",
     "statusVal": "",
     "statusType": "auto",
-    "x": 850,
+    "x": 1000,
     "y": 420,
     "wires": []
   },
@@ -925,7 +951,18 @@
     "label": "Analisis",
     "disabled": false,
     "info": "",
-    "env": []
+    "env": [
+      {
+        "name": "UMBRAL_TEMP",
+        "value": "",
+        "type": "env"
+      },
+      {
+        "name": "UMBRAL_GAS",
+        "value": "",
+        "type": "env"
+      }
+    ]
   },
   {
     "id": "a11a22a33b44c55e",
@@ -1084,7 +1121,7 @@
     "func": "const p = msg.payload || {};\nconst estado = p.estado || p.estado_riesgo || \"N/A\";\nconst a = p.actuadores || {};\nconst deviceId = String(p.device_id || \"N/A\");\n\nreturn [\n  { payload: \"LED=\" + (a.led || \"N/A\") + \" | estado=\" + estado + \" | device=\" + deviceId },\n  { payload: \"Extractor=\" + (a.extractor || \"N/A\") + \" | estado=\" + estado + \" | device=\" + deviceId },\n  { payload: \"Sirena=\" + (a.sirena || \"N/A\") + \" | estado=\" + estado + \" | device=\" + deviceId },\n  { payload: \"Valvula gas=\" + (a.valvula_gas || \"N/A\") + \" | estado=\" + estado + \" | device=\" + deviceId }\n];",
     "outputs": 4,
     "noerr": 0,
-    "x": 1100,
+    "x": 1050,
     "y": 300,
     "wires": [
       [
@@ -1114,8 +1151,8 @@
     "targetType": "msg",
     "statusVal": "payload",
     "statusType": "auto",
-    "x": 1300,
-    "y": 260,
+    "x": 1280,
+    "y": 240,
     "wires": []
   },
   {
@@ -1131,8 +1168,8 @@
     "targetType": "msg",
     "statusVal": "payload",
     "statusType": "auto",
-    "x": 1300,
-    "y": 300,
+    "x": 1280,
+    "y": 280,
     "wires": []
   },
   {
@@ -1148,8 +1185,8 @@
     "targetType": "msg",
     "statusVal": "payload",
     "statusType": "auto",
-    "x": 1300,
-    "y": 340,
+    "x": 1280,
+    "y": 320,
     "wires": []
   },
   {
@@ -1165,8 +1202,8 @@
     "targetType": "msg",
     "statusVal": "payload",
     "statusType": "auto",
-    "x": 1300,
-    "y": 380,
+    "x": 1280,
+    "y": 360,
     "wires": []
   },
   {
@@ -1179,7 +1216,7 @@
     "upload": false,
     "swaggerDoc": "",
     "x": 300,
-    "y": 600,
+    "y": 460,
     "wires": [
       [
         "clean0022220000"
@@ -1194,8 +1231,8 @@
     "func": "const batchSize = msg.payload && msg.payload.batch_size ? Number(msg.payload.batch_size) : 100;\nmsg.topic = \"CALL sp_limpiar_lote(\" + batchSize + \")\";\nmsg.payload = [batchSize];\nreturn msg;\n",
     "outputs": 1,
     "noerr": 0,
-    "x": 500,
-    "y": 600,
+    "x": 580,
+    "y": 640,
     "wires": [
       [
         "clean0033330000"
@@ -1208,8 +1245,8 @@
     "z": "fd207428a5fde675",
     "mydb": "e573d97058b2f511",
     "name": "mysql execute",
-    "x": 700,
-    "y": 600,
+    "x": 800,
+    "y": 640,
     "wires": [
       [
         "clean0044440000"
@@ -1225,8 +1262,8 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "x": 900,
-    "y": 600,
+    "x": 980,
+    "y": 620,
     "wires": []
   },
   {
@@ -1300,7 +1337,7 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "SQL: get_nodes",
-    "func": "const estado = String(msg.payload && msg.payload.estado || msg.req && msg.req.query.estado || \"\").trim().toUpperCase();\nconst zona = String(msg.payload && msg.payload.zona || msg.req && msg.req.query.zona || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.payload && msg.payload.limit || msg.req && msg.req.query.limit || 50) || 50, 1), 200);\nconst offset = Math.max(Number(msg.payload && msg.payload.offset || msg.req && msg.req.query.offset || 0) || 0, 0);\nconst where = [];\nconst params = [];\nif (estado && [\"NORMAL\",\"ALERTA\",\"EMERGENCIA\",\"INVALIDO\"].includes(estado)) {\n  where.push(\"e.estado_riesgo = ?\"); params.push(estado);\n}\nif (zona) { where.push(\"m.zona = ?\"); params.push(zona); }\nconst whereSql = where.length ? \"WHERE \" + where.join(\" AND \") : \"\";\nmsg.topic = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, m.timestamp_origen, m.created_at, m.limpio, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.created_at AS motivo_created_at FROM mediciones_brutas m INNER JOIN (SELECT device_id, MAX(id) AS max_id FROM mediciones_brutas GROUP BY device_id) t ON m.device_id = t.device_id AND m.id = t.max_id LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores GROUP BY device_id) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id \" + whereSql + \" ORDER BY m.device_id LIMIT ? OFFSET ?\";\nmsg.payload = params.concat([limit, offset]);\nreturn msg;",
+    "func": "const estado = String(msg.payload && msg.payload.estado || msg.req && msg.req.query.estado || \"\").trim().toUpperCase();\nconst zona = String(msg.payload && msg.payload.zona || msg.req && msg.req.query.zona || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.payload && msg.payload.limit || msg.req && msg.req.query.limit || 50) || 50, 1), 200);\nconst offset = Math.max(Number(msg.payload && msg.payload.offset || msg.req && msg.req.query.offset || 0) || 0, 0);\nconst where = [];\nconst params = [];\nif (estado && [\"NORMAL\",\"ALERTA\",\"EMERGENCIA\",\"INVALIDO\"].includes(estado)) {\n  where.push(\"e.estado_riesgo = ?\"); params.push(estado);\n}\nif (zona) { where.push(\"m.zona = ?\"); params.push(zona); }\nconst whereSql = where.length ? \"WHERE \" + where.join(\" AND \") : \"\";\nmsg.topic = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, m.timestamp_origen, m.created_at, m.limpio, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.led_estado, evt.extractor_estado, evt.sirena_estado, evt.valvula_gas_estado, evt.created_at AS motivo_created_at FROM mediciones_brutas m INNER JOIN (SELECT device_id, MAX(id) AS max_id FROM mediciones_brutas GROUP BY device_id) t ON m.device_id = t.device_id AND m.id = t.max_id LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores GROUP BY device_id) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id \" + whereSql + \" ORDER BY m.device_id LIMIT ? OFFSET ?\";\nmsg.payload = params.concat([limit, offset]);\nreturn msg;",
     "outputs": 1,
     "noerr": 0,
     "initialize": "",
@@ -1324,6 +1361,22 @@
     "y": 1160,
     "wires": [
       [
+        "api2007"
+      ]
+    ]
+  },
+  {
+    "id": "api2007",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "build actuadores in rows",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = rows.map(r => ({\n  ...r,\n  actuadores: {\n    led: r.led_estado || \"N/A\",\n    extractor: r.extractor_estado || \"N/A\",\n    sirena: r.sirena_estado || \"N/A\",\n    valvula_gas: r.valvula_gas_estado || \"N/A\"\n  }\n}));\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 850,
+    "y": 1160,
+    "wires": [
+      [
         "api1004"
       ]
     ]
@@ -1337,7 +1390,7 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "x": 880,
+    "x": 1100,
     "y": 1160,
     "wires": []
   },
@@ -1363,7 +1416,7 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "SQL: get_node_latest",
-    "func": "const id = String(msg.req && msg.req.params && msg.req.params.id || \"\").trim();\nif (!id) { msg.payload = { error: \"device_id requerido\" }; return msg; }\nmsg.topic = \"SELECT m.*, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.created_at AS motivo_created_at FROM mediciones_brutas m LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores WHERE device_id = ?) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id WHERE m.device_id = ? ORDER BY m.timestamp_origen DESC, m.id DESC LIMIT 1\";\nmsg.payload = [id, id];\nreturn msg;",
+    "func": "const id = String(msg.req && msg.req.params && msg.req.params.id || \"\").trim();\nif (!id) { msg.payload = { error: \"device_id requerido\" }; return msg; }\nmsg.topic = \"SELECT m.*, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.led_estado, evt.extractor_estado, evt.sirena_estado, evt.valvula_gas_estado, evt.created_at AS motivo_created_at FROM mediciones_brutas m LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores WHERE device_id = ?) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id WHERE m.device_id = ? ORDER BY m.timestamp_origen DESC, m.id DESC LIMIT 1\";\nmsg.payload = [id, id];\nreturn msg;",
     "outputs": 1,
     "noerr": 0,
     "initialize": "",
@@ -1387,6 +1440,22 @@
     "y": 1220,
     "wires": [
       [
+        "api2008"
+      ]
+    ]
+  },
+  {
+    "id": "api2008",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "build actuadores latest",
+    "func": "const row = (Array.isArray(msg.payload) && msg.payload[0]) || msg.payload || {};\nif (row && row.device_id) {\n  row.actuadores = {\n    led: row.led_estado || \"N/A\",\n    extractor: row.extractor_estado || \"N/A\",\n    sirena: row.sirena_estado || \"N/A\",\n    valvula_gas: row.valvula_gas_estado || \"N/A\"\n  };\n}\nmsg.payload = row;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 840,
+    "y": 1220,
+    "wires": [
+      [
         "api1008"
       ]
     ]
@@ -1400,7 +1469,7 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "x": 880,
+    "x": 1110,
     "y": 1220,
     "wires": []
   },
@@ -1476,7 +1545,7 @@
     "method": "get",
     "upload": false,
     "swaggerDoc": "",
-    "x": 200,
+    "x": 160,
     "y": 1340,
     "wires": [
       [
@@ -1558,7 +1627,7 @@
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "x": 420,
+    "x": 440,
     "y": 1400,
     "wires": [
       [
@@ -1598,8 +1667,8 @@
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "x": 420,
-    "y": 1440,
+    "x": 660,
+    "y": 1420,
     "wires": [
       [
         "api1020"
@@ -1615,8 +1684,8 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "x": 880,
-    "y": 1400,
+    "x": 870,
+    "y": 1420,
     "wires": []
   },
   {
@@ -1641,7 +1710,7 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "SQL: summary",
-    "func": "msg.topic = \"SELECT (SELECT COUNT(*) FROM mediciones_brutas) AS total_brutas, (SELECT COUNT(*) FROM mediciones_brutas WHERE limpio = 0) AS total_pendientes, (SELECT COUNT(*) FROM mediciones_limpias) AS total_limpias, (SELECT COUNT(*) FROM incidencias) AS total_incidencias, (SELECT COUNT(*) FROM analisis_mediciones) AS total_analisis, (SELECT COUNT(*) FROM eventos_actuadores) AS total_eventos, (SELECT MAX(timestamp_origen) FROM mediciones_brutas) AS ultima_medicion, (SELECT MAX(created_at) FROM mediciones_limpias) AS ultima_limpia, (SELECT MAX(created_at) FROM incidencias) AS ultima_incidencia, (SELECT MAX(fecha_generacion) FROM analisis_mediciones) AS ultima_analisis, (SELECT MAX(created_at) FROM eventos_actuadores) AS ultimo_evento\";\nmsg.payload = [];\nreturn msg;",
+    "func": "msg.topic = \"SELECT (SELECT COUNT(*) FROM mediciones_brutas) AS total_brutas, (SELECT COUNT(*) FROM mediciones_brutas WHERE limpio = 0) AS total_pendientes, (SELECT COUNT(*) FROM mediciones_limpias) AS total_limpias, (SELECT COUNT(*) FROM incidencias) AS total_incidencias, (SELECT COUNT(*) FROM analisis_mediciones) AS total_analisis, (SELECT COUNT(*) FROM eventos_actuadores) AS total_eventos, (SELECT MAX(timestamp_origen) FROM mediciones_brutas) AS ultima_medicion, (SELECT MAX(created_at) FROM mediciones_limpias) AS ultima_limpia, (SELECT MAX(created_at) FROM incidencias) AS ultima_incidencia, (SELECT MAX(fecha_generacion) FROM analisis_mediciones) AS ultima_analisis, (SELECT MAX(created_at) FROM eventos_actuadores) AS ultimo_evento, COALESCE((SELECT JSON_ARRAYAGG(JSON_OBJECT('limpio', t.limpio, 'total', t.total, 'ultima_medicion', t.ultima_medicion)) FROM (SELECT limpio, COUNT(*) AS total, MAX(created_at) AS ultima_medicion FROM mediciones_brutas GROUP BY limpio ORDER BY limpio) t), JSON_ARRAY()) AS calidad, COALESCE((SELECT JSON_ARRAYAGG(JSON_OBJECT('estado_riesgo', t.estado_riesgo, 'total', t.total, 'ultima_medicion', t.ultima_medicion)) FROM (SELECT estado_riesgo, COUNT(*) AS total, MAX(created_at) AS ultima_medicion FROM estados_medicion WHERE estado_riesgo IN ('ALERTA','EMERGENCIA') GROUP BY estado_riesgo ORDER BY total DESC) t), JSON_ARRAY()) AS riesgos, COALESCE((SELECT JSON_ARRAYAGG(JSON_OBJECT('tipo_incidencia', t.tipo_incidencia, 'total', t.total)) FROM (SELECT tipo_incidencia, COUNT(*) AS total FROM incidencias GROUP BY tipo_incidencia ORDER BY total DESC) t), JSON_ARRAY()) AS incidencias_por_tipo\";\nmsg.payload = [];\nreturn msg;",
     "outputs": 1,
     "noerr": 0,
     "initialize": "",
@@ -1678,7 +1747,7 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "x": 880,
+    "x": 1110,
     "y": 1460,
     "wires": []
   },
@@ -2019,7 +2088,7 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "SQL: stream_latest",
-    "func": "const estado = String(msg.req && msg.req.query.estado || \"\").trim().toUpperCase();\nconst zona = String(msg.req && msg.req.query.zona || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 200) || 200, 1), 200);\nconst offset = Math.max(Number(msg.req && msg.req.query.offset || 0) || 0, 0);\nconst where = []; const params = [];\nif (estado && [\"NORMAL\",\"ALERTA\",\"EMERGENCIA\",\"INVALIDO\"].includes(estado)) { where.push(\"e.estado_riesgo = ?\"); params.push(estado); }\nif (zona) { where.push(\"m.zona = ?\"); params.push(zona); }\nconst whereSql = where.length ? \"WHERE \" + where.join(\" AND \") : \"\";\nparams.push(limit); params.push(offset);\nmsg.topic = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, m.timestamp_origen, m.created_at, m.limpio, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.created_at AS motivo_created_at FROM mediciones_brutas m INNER JOIN (SELECT device_id, MAX(id) AS max_id FROM mediciones_brutas GROUP BY device_id) t ON m.device_id = t.device_id AND m.id = t.max_id LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores GROUP BY device_id) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id \" + whereSql + \" ORDER BY m.device_id LIMIT ? OFFSET ?\";\nmsg.payload = params;\nreturn msg;",
+    "func": "const estado = String(msg.req && msg.req.query.estado || \"\").trim().toUpperCase();\nconst zona = String(msg.req && msg.req.query.zona || \"\").trim();\nconst limit = Math.min(Math.max(Number(msg.req && msg.req.query.limit || 200) || 200, 1), 200);\nconst offset = Math.max(Number(msg.req && msg.req.query.offset || 0) || 0, 0);\nconst where = []; const params = [];\nif (estado && [\"NORMAL\",\"ALERTA\",\"EMERGENCIA\",\"INVALIDO\"].includes(estado)) { where.push(\"e.estado_riesgo = ?\"); params.push(estado); }\nif (zona) { where.push(\"m.zona = ?\"); params.push(zona); }\nconst whereSql = where.length ? \"WHERE \" + where.join(\" AND \") : \"\";\nparams.push(limit); params.push(offset);\nmsg.topic = \"SELECT m.id, m.device_id, m.zona, m.temperatura_c, m.mq135_aire, m.timestamp_origen, m.created_at, m.limpio, e.estado_riesgo, e.detalle_estado, e.tiempo_espera_seg, evt.motivo_activacion, evt.led_estado, evt.extractor_estado, evt.sirena_estado, evt.valvula_gas_estado, evt.created_at AS motivo_created_at FROM mediciones_brutas m INNER JOIN (SELECT device_id, MAX(id) AS max_id FROM mediciones_brutas GROUP BY device_id) t ON m.device_id = t.device_id AND m.id = t.max_id LEFT JOIN estados_medicion e ON e.medicion_id = m.id LEFT JOIN (SELECT device_id, MAX(id) AS max_evt_id FROM eventos_actuadores GROUP BY device_id) te ON te.device_id = m.device_id LEFT JOIN eventos_actuadores evt ON evt.id = te.max_evt_id \" + whereSql + \" ORDER BY m.device_id LIMIT ? OFFSET ?\";\nmsg.payload = params;\nreturn msg;",
     "outputs": 1,
     "noerr": 0,
     "initialize": "",
@@ -2043,6 +2112,22 @@
     "y": 1880,
     "wires": [
       [
+        "api2009"
+      ]
+    ]
+  },
+  {
+    "id": "api2009",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "build actuadores stream",
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.payload = rows.map(r => ({\n  ...r,\n  actuadores: {\n    led: r.led_estado || \"N/A\",\n    extractor: r.extractor_estado || \"N/A\",\n    sirena: r.sirena_estado || \"N/A\",\n    valvula_gas: r.valvula_gas_estado || \"N/A\"\n  }\n}));\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 850,
+    "y": 1880,
+    "wires": [
+      [
         "api1049"
       ]
     ]
@@ -2056,8 +2141,8 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "x": 880,
-    "y": 1880,
+    "x": 1100,
+    "y": 1900,
     "wires": []
   },
   {
@@ -2065,13 +2150,13 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "format summary response",
-    "func": "const row = (Array.isArray(msg.payload) && msg.payload[0]) || msg.payload || {};\nif (row.id === undefined && Array.isArray(msg.payload) && msg.payload.length > 0) {\n  // Already formatted, pass through\n  return msg;\n}\nrow.calidad = [];\nrow.riesgos = [];\nrow.incidencias_por_tipo = [];\nrow.pendientes_muestra = [];\nmsg.payload = row;\nreturn msg;",
+    "func": "const arr = Array.isArray(msg.payload) ? msg.payload : [msg.payload];\nconst row = (arr[0] && typeof arr[0] === \"object\") ? arr[0] : {};\ntry {\n  row.calidad = typeof row.calidad === \"string\" ? JSON.parse(row.calidad) : (row.calidad || []);\n  row.riesgos = typeof row.riesgos === \"string\" ? JSON.parse(row.riesgos) : (row.riesgos || []);\n  row.incidencias_por_tipo = typeof row.incidencias_por_tipo === \"string\" ? JSON.parse(row.incidencias_por_tipo) : (row.incidencias_por_tipo || []);\n} catch (e) {\n  row.calidad = [];\n  row.riesgos = [];\n  row.incidencias_por_tipo = [];\n}\nrow.pendientes_muestra = [];\nmsg.payload = row;\nreturn msg;",
     "outputs": 1,
     "noerr": 0,
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "x": 780,
+    "x": 870,
     "y": 1460,
     "wires": [
       [
@@ -2107,7 +2192,7 @@
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "x": 420,
+    "x": 430,
     "y": 1820,
     "wires": [
       [
@@ -2134,14 +2219,78 @@
     "type": "function",
     "z": "fd207428a5fde675",
     "name": "compute monthly analysis",
-    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nif (rows.length === 0) {\n    msg.payload = { ok: true, message: \"Sin datos para analizar en los ultimos 30 dias\", groups: 0 };\n    return msg;\n}\nfunction mean(arr) { if (!arr.length) return null; return arr.reduce((s, v) => s + v, 0) / arr.length; }\nfunction round(v, d) { return Number.isFinite(v) ? Number(v.toFixed(d || 2)) : null; }\nfunction toDate(r) { const dt = new Date(r); return Number.isFinite(dt.getTime()) ? dt : null; }\n\nconst byGroup = {};\nfor (const row of rows) {\n    const key = row.device_id + \"|\" + row.zona;\n    if (!byGroup[key]) byGroup[key] = [];\n    byGroup[key].push(row);\n}\n\nconst results = [];\nfor (const [key, group] of Object.entries(byGroup)) {\n    const [device_id, zona] = key.split(\"|\");\n    const temps = group.map(r => Number(r.temperatura_c)).filter(v => Number.isFinite(v));\n    const gases = group.map(r => Number(r.mq135_aire)).filter(v => Number.isFinite(v));\n    const timestamps = group.map(r => toDate(r.timestamp_origen)).filter(Boolean);\n    const minTs = timestamps.length ? new Date(Math.min(...timestamps)) : null;\n    const maxTs = timestamps.length ? new Date(Math.max(...timestamps)) : null;\n    const tAvg = temps.length ? mean(temps) : null;\n    const gAvg = gases.length ? mean(gases) : null;\n    results.push({\n        device_id, zona, periodo_dias: 30,\n        total_registros: group.length,\n        fecha_inicio_analisis: minTs, fecha_fin_analisis: maxTs,\n        temp_promedio: round(tAvg), mq135_promedio: round(gAvg)\n    });\n}\nmsg.payload = { ok: true, message: \"Analisis mensual completado para \" + results.length + \" grupo(s)\", groups: results.length, data: results };\nreturn msg;",
-    "outputs": 1,
+    "func": "const rows = Array.isArray(msg.payload) ? msg.payload : [];\nif (rows.length === 0) {\n    msg.payload = { ok: true, message: \"Sin datos para analizar en los ultimos 30 dias\", groups: 0 };\n    return [null, msg];\n}\nconst UMBRAL_TEMP = Number(env.get(\"UMBRAL_TEMP\")) || 28.0;\nconst UMBRAL_GAS = Number(env.get(\"UMBRAL_GAS\")) || 3600;\nfunction toDate(r) { const dt = new Date(r); return Number.isFinite(dt.getTime()) ? dt : null; }\nfunction toSql(dt) { return dt ? dt.toISOString().slice(0, 19).replace(\"T\", \" \") : null; }\nfunction mean(arr) { if (!arr.length) return null; return arr.reduce((s, v) => s + v, 0) / arr.length; }\nfunction round(v, d) { return Number.isFinite(v) ? Number(v.toFixed(d || 2)) : null; }\nfunction median(arr) { if (!arr.length) return null; const s = arr.slice().sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; }\nfunction mode(arr) { if (!arr.length) return null; const c = {}; let best = null; let bc = 0; for (const v of arr) { const k = Number(v).toFixed(2); c[k] = (c[k]||0)+1; if (c[k] > bc) { bc = c[k]; best = Number(k); } } return best; }\nfunction variance(arr, avg) { if (!arr.length) return null; const m = Number.isFinite(avg) ? avg : mean(arr); if (!Number.isFinite(m)) return null; return arr.reduce((s, v) => s + (v-m)*(v-m), 0) / arr.length; }\nfunction stddev(arr, avg) { const v = variance(arr, avg); return Number.isFinite(v) ? Math.sqrt(v) : null; }\nfunction min(arr) { return arr.length ? Math.min(...arr) : null; }\nfunction max(arr) { return arr.length ? Math.max(...arr) : null; }\nfunction range(arr) { return arr.length ? Math.max(...arr) - Math.min(...arr) : null; }\n\nconst byGroup = {};\nfor (const row of rows) {\n    const key = row.device_id + \"|\" + row.zona;\n    if (!byGroup[key]) byGroup[key] = [];\n    byGroup[key].push(row);\n}\n\nconst results = [];\nfor (const [key, group] of Object.entries(byGroup)) {\n    const [device_id, zona] = key.split(\"|\");\n    const temps = group.map(r => Number(r.temperatura_c)).filter(v => Number.isFinite(v));\n    const gases = group.map(r => Number(r.mq135_aire)).filter(v => Number.isFinite(v));\n    const timestamps = group.map(r => toDate(r.timestamp_origen)).filter(Boolean);\n    const minTs = timestamps.length ? new Date(Math.min(...timestamps)) : null;\n    const maxTs = timestamps.length ? new Date(Math.max(...timestamps)) : null;\n    const tAvg = temps.length ? mean(temps) : null;\n    const gAvg = gases.length ? mean(gases) : null;\n    results.push({\n        device_id, zona, periodo_dias: 30,\n        total_registros: group.length,\n        fecha_inicio_analisis: toSql(minTs),\n        fecha_fin_analisis: toSql(maxTs),\n        temp_promedio: round(tAvg),\n        temp_mediana: round(temps.length ? median(temps) : null),\n        temp_moda: round(temps.length ? mode(temps) : null),\n        temp_minima: round(temps.length ? min(temps) : null),\n        temp_maxima: round(temps.length ? max(temps) : null),\n        temp_rango: round(temps.length ? range(temps) : null),\n        temp_stddev: round(temps.length ? stddev(temps) : null),\n        temp_varianza: round(temps.length ? variance(temps) : null),\n        temp_fuera_rango: temps.filter(v => v > UMBRAL_TEMP).length,\n        temp_anomalias: temps.filter(v => v > 50 || v < 0).length,\n        mq135_promedio: round(gAvg),\n        mq135_mediana: round(gases.length ? median(gases) : null),\n        mq135_moda: round(gases.length ? mode(gases) : null),\n        mq135_minima: round(gases.length ? min(gases) : null),\n        mq135_maxima: round(gases.length ? max(gases) : null),\n        mq135_rango: round(gases.length ? range(gases) : null),\n        mq135_stddev: round(gases.length ? stddev(gases) : null),\n        mq135_varianza: round(gases.length ? variance(gases) : null),\n        mq135_fuera_rango: gases.filter(v => v > UMBRAL_GAS).length,\n        mq135_anomalias: gases.filter(v => v > 4095 || v < 0).length,\n        corr_temp_mq135: null\n    });\n}\nmsg.payload = results;\nmsg.responseData = { ok: true, message: \"Analisis mensual completado para \" + results.length + \" grupo(s)\", groups: results.length };\nreturn [msg, msg];",
+    "outputs": 2,
     "noerr": 0,
     "initialize": "",
     "finalize": "",
     "libs": [],
     "x": 880,
     "y": 1820,
+    "wires": [
+      [
+        "api2010"
+      ],
+      [
+        "api2012"
+      ]
+    ]
+  },
+  {
+    "id": "api2010",
+    "type": "split",
+    "z": "fd207428a5fde675",
+    "name": "split monthly results",
+    "splt": "\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "x": 1140,
+    "y": 1800,
+    "wires": [
+      [
+        "api2011"
+      ]
+    ]
+  },
+  {
+    "id": "api2011",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "build insert analisis",
+    "func": "const row = msg.payload || {};\nif (!row.device_id) return null;\nconst cols = [\"device_id\",\"zona\",\"periodo_dias\",\"total_registros\",\"fecha_inicio_analisis\",\"fecha_fin_analisis\",\"fecha_generacion\",\"temp_promedio\",\"temp_mediana\",\"temp_moda\",\"temp_minima\",\"temp_maxima\",\"temp_rango\",\"temp_stddev\",\"temp_varianza\",\"temp_fuera_rango\",\"temp_anomalias\",\"mq135_promedio\",\"mq135_mediana\",\"mq135_moda\",\"mq135_minima\",\"mq135_maxima\",\"mq135_rango\",\"mq135_stddev\",\"mq135_varianza\",\"mq135_fuera_rango\",\"mq135_anomalias\",\"corr_temp_mq135\"];\nconst now = new Date().toISOString().slice(0, 19).replace(\"T\", \" \");\nconst vals = cols.map(c => c === \"fecha_generacion\" ? now : row[c]);\nmsg.topic = \"INSERT INTO analisis_mediciones (\" + cols.join(\",\") + \") VALUES (\" + cols.map(() => \"?\").join(\",\") + \")\";\nmsg.payload = vals;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 1360,
+    "y": 1800,
+    "wires": [
+      [
+        "api2013"
+      ]
+    ]
+  },
+  {
+    "id": "api2013",
+    "type": "mysql",
+    "z": "fd207428a5fde675",
+    "mydb": "e573d97058b2f511",
+    "name": "mysql insert analisis",
+    "x": 1580,
+    "y": 1800,
+    "wires": []
+  },
+  {
+    "id": "api2012",
+    "type": "function",
+    "z": "fd207428a5fde675",
+    "name": "format monthly response",
+    "func": "msg.payload = msg.responseData || { ok: true, message: \"Analisis mensual completado\" };\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 1170,
+    "y": 1860,
     "wires": [
       [
         "api2006"
@@ -2157,8 +2306,8 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "x": 1100,
-    "y": 1820,
+    "x": 1390,
+    "y": 1860,
     "wires": []
   }
 ]

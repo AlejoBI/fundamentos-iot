@@ -13,12 +13,7 @@
 #define LED_AMARILLO 26
 #define LED_ROJO 27
 
-const float UMBRAL_TEMP = 28.0;
-const int UMBRAL_GAS = 3600;
-
-const char *NOMBRE_ZONA = "Cocina-Principal";
-const char *DEVICE_ID = "ESP32-Cocina-01";
-const unsigned long PUBLISH_INTERVAL_DEFAULT_MS = 5000;
+const unsigned long PUBLISH_INTERVAL_DEFAULT_MS = INTERVALO_NORMAL_MS;
 
 const char *ssid = WIFI_SSID;
 const char *password = WIFI_PASSWORD;

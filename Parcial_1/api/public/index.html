@@ -89,13 +89,31 @@
               </div>
             </div>
 
+            <div class="actuator-bar" id="actuatorBar">
+              <div class="actuator-item" data-actuator="led">
+                <span class="act-label">LED</span>
+                <span class="act-led" id="actLed">●</span>
+                <span class="act-value" id="actLedValue">--</span>
+              </div>
+              <div class="actuator-item" data-actuator="extractor">
+                <span class="act-label">Extractor</span>
+                <span class="act-icon" id="actExtractor">⛁</span>
+                <span class="act-value" id="actExtractorValue">--</span>
+              </div>
+              <div class="actuator-item" data-actuator="sirena">
+                <span class="act-label">Sirena</span>
+                <span class="act-icon" id="actSirena">♪</span>
+                <span class="act-value" id="actSirenaValue">--</span>
+              </div>
+              <div class="actuator-item" data-actuator="valvula">
+                <span class="act-label">Valvula Gas</span>
+                <span class="act-icon" id="actValvula">⊘</span>
+                <span class="act-value" id="actValvulaValue">--</span>
+              </div>
+            </div>
+
             <div class="detail-body">
               <div class="controls">
-                <div class="state-buttons">
-                  <button data-state="LIBRE" class="state">LIBRE</button>
-                  <button data-state="RESERVADA" class="state">RESERVADA</button>
-                  <button data-state="FUMIGACION" class="state">FUMIGACION</button>
-                </div>
                 <div class="status-message command-chip" id="actionStatus">
                   <span class="label">Comando</span>
                   <span class="value">Sin comandos</span>
@@ -110,6 +128,23 @@
                 <div class="chart-card">
                   <h3>MQ135</h3>
                   <canvas id="gasChart"></canvas>
+                </div>
+              </div>
+
+              <div class="gauges">
+                <div class="gauge-card">
+                  <h3>Temperatura</h3>
+                  <div class="gauge-wrap">
+                    <canvas id="tempGauge"></canvas>
+                    <span class="gauge-value" id="tempGaugeValue">--</span>
+                  </div>
+                </div>
+                <div class="gauge-card">
+                  <h3>Gas MQ135</h3>
+                  <div class="gauge-wrap">
+                    <canvas id="gasGauge"></canvas>
+                    <span class="gauge-value" id="gasGaugeValue">--</span>
+                  </div>
                 </div>
               </div>
 
@@ -148,6 +183,7 @@
                 <span class="value">Sin ejecuciones.</span>
               </div>
             </div>
+            <div class="analysis-section-divider"></div>
             <div class="summary-cards">
               <div class="summary-card">
                 <span>Brutas</span>
@@ -182,7 +218,7 @@
             </div>
             <div class="insights-grid">
               <div class="insight-card">
-                <h3>Calidad</h3>
+                <h3>Calidad <span class="chart-info" title="Proporcion de mediciones procesadas (limpias) vs pendientes">ⓘ</span></h3>
                 <div id="qualityBreakdown" class="breakdown-list">Sin datos.</div>
               </div>
               <div class="insight-card">
@@ -192,6 +228,26 @@
               <div class="insight-card">
                 <h3>Incidencias por tipo</h3>
                 <div id="incidentTypeBreakdown" class="breakdown-list">Sin datos.</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel analysis-charts-panel">
+            <div class="panel-header">
+              <h2>Visualizacion de analisis mensual</h2>
+            </div>
+            <div class="analysis-charts-grid">
+              <div class="analysis-chart-card">
+                <h3>Promedios por dispositivo <span class="chart-info" title="Temp (°C) en eje izquierdo, MQ135 (ppm) en eje derecho">ⓘ</span></h3>
+                <canvas id="analysisBarChart"></canvas>
+              </div>
+              <div class="analysis-chart-card">
+                <h3>Distribucion de riesgo <span class="chart-info" title="Distribucion de estados de riesgo (NORMAL, ALERTA, EMERGENCIA, INVALIDO) en eventos registrados">ⓘ</span></h3>
+                <canvas id="analysisPieChart"></canvas>
+              </div>
+              <div class="analysis-chart-card">
+                <h3>Tendencia historica <span class="chart-info" title="Evolucion temporal de temperatura (°C) y gas MQ135 (ppm) con ejes Y separados">ⓘ</span></h3>
+                <canvas id="analysisLineChart"></canvas>
               </div>
             </div>
           </section>
@@ -255,7 +311,7 @@
       </section>
     </div>
 
-    <script src="/vendor/chart.js"></script>
+    <script src="/vendor/chart.js" onerror="this.remove();document.write('<script src=\'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js\'><\/scr\'+\'ipt\>')"></script>
     <script src="/app.js"></script>
   </body>
 </html>
