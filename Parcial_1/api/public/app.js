@@ -572,28 +572,12 @@ function renderAnalysisTable(container, items, latestDate) {
   container.className = "table analysis-table-container";
   container.innerHTML = "";
   if (!items.length) { container.innerHTML = '<div class="table-empty">Sin datos.</div>'; return; }
-  const columns = [
-    ["device_id", "Dispositivo"],
-    ["zona", "Zona"],
-    ["periodo_dias", "Periodo (dias)"],
-    ["total_registros", "Registros"],
-    ["fecha_generacion", "Generado"],
-    ["fecha_inicio_analisis", "Inicio"],
-    ["fecha_fin_analisis", "Fin"],
-    ["temp_promedio", "Temp Prom"],
-    ["temp_minima", "Temp Min"],
-    ["temp_maxima", "Temp Max"],
-    ["mq135_promedio", "MQ135 Prom"],
-    ["mq135_minima", "MQ135 Min"],
-    ["mq135_maxima", "MQ135 Max"],
-    ["temp_fuera_rango", "Temp FR"],
-    ["mq135_fuera_rango", "MQ135 FR"]
-  ];
+  const columns = Object.keys(items[0]);
   const scroller = document.createElement("div"); scroller.className = "analysis-table-scroll";
   const table = document.createElement("table"); table.className = "analysis-full-table";
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
-  columns.forEach(([, label]) => { const cell = document.createElement("th"); cell.textContent = label; headerRow.appendChild(cell); });
+  columns.forEach((column) => { const cell = document.createElement("th"); cell.textContent = column; headerRow.appendChild(cell); });
   thead.appendChild(headerRow);
   const tbody = document.createElement("tbody");
   items.forEach((item) => {
@@ -601,11 +585,11 @@ function renderAnalysisTable(container, items, latestDate) {
     if (latestDate && item.fecha_generacion && item.fecha_generacion === latestDate) {
       row.classList.add("latest-analysis");
     }
-    columns.forEach(([col]) => {
-      const value = item[col];
+    columns.forEach((column) => {
+      const value = item[column];
       const cell = document.createElement("td");
       if (value && typeof value === "object") cell.className = "json-cell";
-      cell.textContent = formatAnalysisValue(col, value);
+      cell.textContent = formatAnalysisValue(column, value);
       row.appendChild(cell);
     });
     tbody.appendChild(row);

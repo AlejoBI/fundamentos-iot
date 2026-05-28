@@ -511,6 +511,11 @@ h1 {
 .analysis-layout {
   display: grid;
   gap: 24px;
+  min-width: 0;
+}
+
+.analysis-layout > * {
+  min-width: 0;
 }
 
 .analysis-toolbar {
