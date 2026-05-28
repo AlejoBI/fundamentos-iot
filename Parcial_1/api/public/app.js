@@ -795,7 +795,7 @@ async function loadAnalysis() {
       fetchJson(`${API_BASE}/analysis/limpias?limit=20`),
       fetchJson(`${API_BASE}/analysis/brutas?limpio=0&limit=12`),
       fetchJson(`${API_BASE}/analysis/analisis?limit=200`),
-      fetchJson(`${API_BASE}/analysis/eventos?limit=200`)
+      fetchJson(`${API_BASE}/analysis/eventos?limit=50`)
     ]);
 
     if (countBrutas) countBrutas.textContent = formatNumber(summary.total_brutas);

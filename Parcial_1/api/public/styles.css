@@ -733,6 +733,11 @@ h1 {
   padding: 8px;
 }
 
+.data-section {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
 .analysis-table-container {
   overflow: hidden;
 }
